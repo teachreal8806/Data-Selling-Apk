@@ -277,10 +277,10 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
               onLogout();
               onClose();
             }}
-            className="w-full flex items-center gap-3.5 px-5 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors text-left"
+            className="w-full flex items-center gap-3.5 px-5 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
           >
             <LogOut className="w-5 h-5 text-rose-500" />
-            <span>Logout / Reset Data</span>
+            <span>Logout</span>
           </button>
         </nav>
 

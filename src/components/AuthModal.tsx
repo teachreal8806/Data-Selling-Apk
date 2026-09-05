@@ -12,6 +12,7 @@ interface AuthModalProps {
   existingUsers: UserAccount[];
   initialMode?: 'LOGIN' | 'SIGNUP' | 'ADMIN';
   isFirstTime?: boolean;
+  canClose?: boolean;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -22,6 +23,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   existingUsers,
   initialMode = 'LOGIN',
   isFirstTime = false,
+  canClose = true,
 }) => {
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'ADMIN'>(initialMode);
   const [email, setEmail] = useState('');
@@ -232,12 +234,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 : 'Start sharing data & earning real rupees'}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {canClose && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Tab switch */}

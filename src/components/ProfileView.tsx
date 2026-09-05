@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, Lock } from 'lucide-react';
+import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, Lock, LogOut } from 'lucide-react';
 import { UserState } from '../types';
 
 interface ProfileViewProps {
@@ -7,6 +7,7 @@ interface ProfileViewProps {
   onBack: () => void;
   onUpdateProfile: (updated: Partial<UserState>) => void;
   onOpenAdmin?: () => void;
+  onLogout?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -14,6 +15,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onBack,
   onUpdateProfile,
   onOpenAdmin,
+  onLogout,
 }) => {
   const [email, setEmail] = useState(userState.email);
   const [phone, setPhone] = useState(userState.phone);
@@ -178,13 +180,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <button
             type="submit"
             id="btn-save-profile"
-            className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-sm transition-all shadow-xs flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>Save Profile</span>
           </button>
         </form>
       </div>
+
+      {/* Account Logout Action */}
+      {onLogout && (
+        <button
+          type="button"
+          id="btn-profile-logout"
+          onClick={onLogout}
+          className="w-full py-3 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+        >
+          <LogOut className="w-4 h-4 text-rose-500" />
+          <span>Logout Account</span>
+        </button>
+      )}
     </div>
   );
 };

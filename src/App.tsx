@@ -72,6 +72,16 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
 
+  // User authentication state: require signup/login before accessing app
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('datasell_is_logged_in') === 'true';
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  });
+
   // 1. Registered Users database
   const [users, setUsers] = useState<UserAccount[]>(() => {
     try {
@@ -445,6 +455,27 @@ export default function App() {
       hasCompletedRequiredDeposit: account.hasCompletedRequiredDeposit,
       withdrawalDepositNotice: account.withdrawalDepositNotice,
     });
+
+    // 4. Mark as authenticated
+    setIsLoggedIn(true);
+    try {
+      localStorage.setItem('datasell_is_logged_in', 'true');
+    } catch (e) {
+      console.error(e);
+    }
+    setIsAuthModalOpen(false);
+  };
+
+  // User Logout: completely terminates session and blocks dashboard until signup/login
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    try {
+      localStorage.removeItem('datasell_is_logged_in');
+    } catch (e) {
+      console.error(e);
+    }
+    setIsMenuOpen(false);
+    setCurrentView('dashboard');
   };
 
   // Add new deposit (from user deposit form or admin credit)
@@ -518,6 +549,26 @@ export default function App() {
     );
   }
 
+  // If user is not logged in / signed up, block entire app and require sign up or login
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex flex-col items-center justify-center p-4">
+        <AuthModal
+          isOpen={true}
+          canClose={false}
+          onClose={() => {}}
+          onAuthSuccess={handleAuthSuccess}
+          onAdminAuthSuccess={() => {
+            setCurrentView('admin');
+          }}
+          existingUsers={users}
+          initialMode="SIGNUP"
+          isFirstTime={true}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start antialiased text-slate-800">
       {/* Container simulating the mobile app frame */}
@@ -539,7 +590,7 @@ export default function App() {
           currentView={currentView}
           onSelectView={(view) => setCurrentView(view)}
           userEmail={userState.email}
-          onLogout={handleResetToZero}
+          onLogout={handleLogout}
           onOpenAuth={() => setIsAuthModalOpen(true)}
           telegramLink={supportConfig.telegramLink}
           onOpenAdmin={() => setCurrentView('admin')}
@@ -602,6 +653,7 @@ export default function App() {
               onBack={() => setCurrentView('dashboard')}
               onUpdateProfile={handleUpdateProfile}
               onOpenAdmin={() => setCurrentView('admin')}
+              onLogout={handleLogout}
             />
           )}
 
@@ -623,6 +675,7 @@ export default function App() {
       {/* Auth Modal for Login & Signup with real-time audit logs and Admin Master Gateway */}
       <AuthModal
         isOpen={isAuthModalOpen}
+        canClose={true}
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
         onAdminAuthSuccess={() => {
@@ -630,8 +683,8 @@ export default function App() {
           setCurrentView('admin');
         }}
         existingUsers={users}
-        initialMode={isFirstTimeUser ? 'SIGNUP' : 'LOGIN'}
-        isFirstTime={isFirstTimeUser}
+        initialMode="LOGIN"
+        isFirstTime={false}
       />
     </div>
   );
