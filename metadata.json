@@ -1,0 +1,6 @@
+{
+  "name": "DataSell - Bandwidth Sharing & Earnings",
+  "description": "Sell unused internet data to earn instant cash payouts via UPI, with master Admin Panel for user management, deposit control, live login/signup tracking, and Top 10 earners leaderboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
