@@ -7,7 +7,9 @@ import {
   CheckCircle2, 
   ChevronDown, 
   ChevronUp, 
-  ExternalLink 
+  ExternalLink,
+  ShieldCheck,
+  Headphones
 } from 'lucide-react';
 import { SupportConfig, SupportTicket } from '../types';
 import { formatDateTime } from '../utils';
@@ -82,90 +84,65 @@ export const SupportView: React.FC<SupportViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4">
-      {/* Top Header */}
+    <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4 pb-28 text-slate-800">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
           id="btn-support-back"
-          className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 py-1.5 px-2.5 rounded-lg hover:bg-slate-100 transition-all"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 py-1.5 px-3 rounded-xl hover:bg-slate-100 transition-all cursor-pointer min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Dashboard</span>
         </button>
-        <h2 className="text-sm font-bold text-slate-900">Customer Support Desk</h2>
-        <div className="w-12" />
-      </div>
 
-      {/* Official Telegram Channel Card */}
-      <div className="bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-xl">
-              ✈️
-            </div>
-            <div>
-              <h3 className="text-sm font-bold">Official Telegram Channel</h3>
-              <p className="text-xs text-sky-100">{supportConfig.telegramHandle}</p>
-            </div>
-          </div>
-          <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold uppercase tracking-wider">
-            Official
-          </span>
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold shadow-xs">
+          <Headphones className="w-3.5 h-3.5 text-indigo-600" />
+          <span>24/7 Priority Desk</span>
         </div>
 
-        <p className="text-xs text-sky-100 leading-relaxed">
-          Join our official Telegram community for live payout proofs, system announcements, and instant support updates.
-        </p>
-
-        <a
-          href={supportConfig.telegramLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-2.5 px-4 rounded-xl bg-white text-sky-700 hover:bg-sky-50 active:scale-95 font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-2"
-        >
-          <Send className="w-4 h-4" />
-          <span>Join Telegram Channel ({supportConfig.telegramHandle})</span>
-          <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-        </a>
+        <div className="w-8" />
       </div>
 
-      {/* WhatsApp Direct Support Card */}
-      <div className="bg-emerald-600 text-white rounded-2xl p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-lg">
-              💬
-            </div>
-            <div>
-              <h3 className="text-sm font-bold">24/7 WhatsApp Helpdesk</h3>
-              <p className="text-xs text-emerald-100">{supportConfig.whatsappNumber}</p>
-            </div>
+      {/* Support Hero Card */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-50 via-white to-blue-50 border border-indigo-200 p-5 shadow-sm space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
+            <MessageSquare className="w-6 h-6" />
           </div>
-          <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold uppercase tracking-wider">
-            Live
-          </span>
+          <div>
+            <h2 className="text-sm font-black text-slate-900">Priority Concierge Support</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Instant assistance for UPI deposits & payout clearance</p>
+          </div>
         </div>
 
-        <p className="text-xs text-emerald-100 leading-relaxed">
-          Need instant help with deposits, bank withdrawals, or bandwidth selling? Chat with our team directly.
-        </p>
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          <a
+            href={`https://wa.me/${cleanWhatsApp}?text=Hello%20DataSell%20Support`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="py-2.5 px-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all min-h-[44px] shadow-xs"
+          >
+            <span>WhatsApp Desk</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
 
-        <a
-          href={`https://wa.me/${cleanWhatsApp}?text=Hello%20DataSell%20Support,%20I%20need%20assistance%20with%20my%20account`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-2.5 px-4 rounded-xl bg-white text-emerald-700 hover:bg-emerald-50 active:scale-95 font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-2"
-        >
-          <MessageSquare className="w-4 h-4" />
-          <span>Chat on WhatsApp ({supportConfig.whatsappNumber})</span>
-        </a>
+          <a
+            href={supportConfig.telegramLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="py-2.5 px-3 rounded-2xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all min-h-[44px] shadow-xs"
+          >
+            <span>Telegram Channel</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
 
       {/* FAQs */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs space-y-3">
-        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <HelpCircle className="w-4 h-4 text-blue-600" />
+      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+          <HelpCircle className="w-4 h-4 text-indigo-600" />
           <span>Frequently Asked Questions</span>
         </h3>
 
@@ -173,16 +150,19 @@ export const SupportView: React.FC<SupportViewProps> = ({
           {faqs.map((faq, index) => {
             const isOpen = openFaq === index;
             return (
-              <div key={index} className="border border-slate-100 rounded-xl overflow-hidden">
+              <div 
+                key={index}
+                className="border border-slate-200 rounded-2xl overflow-hidden transition-all bg-slate-50/50"
+              >
                 <button
                   onClick={() => setOpenFaq(isOpen ? null : index)}
-                  className="w-full text-left px-3.5 py-2.5 text-xs font-semibold text-slate-800 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  className="w-full p-3.5 text-left text-xs font-bold text-slate-800 flex items-center justify-between gap-2 hover:bg-slate-100 cursor-pointer min-h-[44px]"
                 >
                   <span>{faq.q}</span>
-                  {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                  {isOpen ? <ChevronUp className="w-4 h-4 text-indigo-600 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
                 </button>
                 {isOpen && (
-                  <div className="px-3.5 pb-3 text-xs text-slate-600 bg-slate-50/50 border-t border-slate-100 leading-relaxed">
+                  <div className="px-3.5 pb-3.5 text-xs text-slate-600 leading-relaxed border-t border-slate-100 pt-2 bg-white">
                     {faq.a}
                   </div>
                 )}
@@ -192,52 +172,51 @@ export const SupportView: React.FC<SupportViewProps> = ({
         </div>
       </div>
 
-      {/* Support Ticket Form */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-2xs space-y-3">
-        <h3 className="text-sm font-bold text-slate-900">Send an Inquiry Ticket</h3>
+      {/* Ticket Submission Form */}
+      <form onSubmit={handleSubmitTicket} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Create Priority Ticket
+        </h3>
 
         {isSubmitted && (
-          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Support ticket submitted! Admin desk will review and update within 15 minutes.</span>
+            <span>Ticket submitted! Support team will respond shortly.</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmitTicket} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Subject</label>
-            <input
-              type="text"
-              required
-              value={ticketSubject}
-              onChange={(e) => setTicketSubject(e.target.value)}
-              placeholder="e.g. Deposit verification, Withdrawal speed, Account inquiry"
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:border-blue-500"
-            />
-          </div>
+        <div className="space-y-1">
+          <label className="block text-xs font-medium text-slate-700">Subject / Category</label>
+          <input
+            type="text"
+            required
+            value={ticketSubject}
+            onChange={(e) => setTicketSubject(e.target.value)}
+            placeholder="e.g. Deposit UTR Verification"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-indigo-500"
+          />
+        </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Message</label>
-            <textarea
-              required
-              rows={3}
-              value={ticketMessage}
-              onChange={(e) => setTicketMessage(e.target.value)}
-              placeholder="Describe your question or issue in detail..."
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:border-blue-500"
-            />
-          </div>
+        <div className="space-y-1">
+          <label className="block text-xs font-medium text-slate-700">Description of Issue</label>
+          <textarea
+            required
+            rows={3}
+            value={ticketMessage}
+            onChange={(e) => setTicketMessage(e.target.value)}
+            placeholder="Provide UTR number or payout details..."
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-indigo-500"
+          />
+        </div>
 
-          <button
-            type="submit"
-            className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs transition-all shadow-xs flex items-center justify-center gap-1.5"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Submit Ticket to Admin</span>
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[44px] flex items-center justify-center gap-2"
+        >
+          <Send className="w-3.5 h-3.5" />
+          <span>Submit Support Ticket</span>
+        </button>
+      </form>
     </div>
   );
 };
-

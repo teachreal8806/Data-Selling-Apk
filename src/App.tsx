@@ -29,6 +29,7 @@ import { TermsView } from './components/TermsView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
+import { BottomNavBar } from './components/BottomNavBar';
 import { 
   INITIAL_TOP_EARNERS, 
   INITIAL_USERS, 
@@ -552,7 +553,11 @@ export default function App() {
   // If user is not logged in / signed up, block entire app and require sign up or login
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        {/* Soft ambient background luminescence */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-indigo-200/40 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
+
         <AuthModal
           isOpen={true}
           canClose={false}
@@ -570,9 +575,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start antialiased text-slate-800">
-      {/* Container simulating the mobile app frame */}
-      <div className="w-full max-w-md min-h-screen bg-slate-50 border-x border-slate-200 shadow-2xl flex flex-col relative pb-8">
+    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start antialiased text-slate-800 relative overflow-x-hidden selection:bg-indigo-500/20 selection:text-indigo-900">
+      {/* Background ambient luminescence for desktop showcase */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-indigo-200/30 via-sky-100/20 to-transparent blur-3xl pointer-events-none rounded-full" />
+      <div className="fixed bottom-0 right-10 w-[400px] h-[400px] bg-emerald-100/30 blur-3xl pointer-events-none rounded-full" />
+
+      {/* Container simulating the smartphone showcase frame */}
+      <div className="w-full max-w-md min-h-screen sm:min-h-[94vh] sm:my-4 sm:rounded-[36px] bg-slate-50 sm:border sm:border-slate-200/90 sm:shadow-2xl sm:shadow-slate-400/20 flex flex-col relative pb-8 overflow-hidden z-10">
         {/* Top Header */}
         <Header
           onOpenMenu={() => setIsMenuOpen(true)}
@@ -670,6 +679,12 @@ export default function App() {
             <TermsView onBack={() => setCurrentView('dashboard')} />
           )}
         </main>
+
+        {/* Bottom Ergonomic Navigation Bar */}
+        <BottomNavBar
+          currentView={currentView}
+          onSelectView={(view) => setCurrentView(view)}
+        />
       </div>
 
       {/* Auth Modal for Login & Signup with real-time audit logs and Admin Master Gateway */}

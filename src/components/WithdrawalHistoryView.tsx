@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Clock, CheckCircle2, AlertCircle, Copy, Check, Filter } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, AlertCircle, Copy, Check, Filter, CreditCard } from 'lucide-react';
 import { WithdrawalRecord } from '../types';
 
 interface WithdrawalHistoryViewProps {
@@ -28,167 +28,132 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4">
+    <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4 pb-28 text-slate-800">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
           id="btn-history-back"
-          className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 py-1.5 px-2 rounded-lg hover:bg-slate-100 transition-all"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 py-1.5 px-3 rounded-xl hover:bg-slate-100 transition-all cursor-pointer min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Dashboard</span>
         </button>
 
-        <h2 className="text-sm font-bold text-slate-900">
-          Withdrawal History
+        <h2 className="text-sm font-black text-slate-900">
+          Payout Statements
         </h2>
 
         <div className="w-16 flex justify-end">
-          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+          <span className="text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
             {records.length}
           </span>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-medium text-slate-600">
+      <div className="flex rounded-2xl bg-slate-100 p-1 text-xs font-bold border border-slate-200">
         <button
           onClick={() => setFilter('ALL')}
-          className={`flex-1 py-1.5 rounded-lg transition-all ${
+          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
             filter === 'ALL'
-              ? 'bg-white text-slate-900 font-bold shadow-2xs'
-              : 'hover:text-slate-900'
+              ? 'bg-white text-indigo-700 font-extrabold shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           All ({records.length})
         </button>
         <button
           onClick={() => setFilter('PENDING')}
-          className={`flex-1 py-1.5 rounded-lg transition-all ${
+          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
             filter === 'PENDING'
-              ? 'bg-white text-amber-700 font-bold shadow-2xs'
-              : 'hover:text-slate-900'
+              ? 'bg-white text-amber-700 font-extrabold shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          Pending ({records.filter((r) => r.status === 'PENDING').length})
+          Pending
         </button>
         <button
           onClick={() => setFilter('SUCCESSFUL')}
-          className={`flex-1 py-1.5 rounded-lg transition-all ${
+          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
             filter === 'SUCCESSFUL'
-              ? 'bg-white text-emerald-700 font-bold shadow-2xs'
-              : 'hover:text-slate-900'
+              ? 'bg-white text-emerald-700 font-extrabold shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          Successful ({records.filter((r) => r.status === 'SUCCESSFUL').length})
+          Settled
         </button>
       </div>
 
-      {/* History Cards List */}
-      {filteredRecords.length === 0 ? (
-        <div className="p-8 text-center bg-white rounded-2xl border border-slate-100 shadow-2xs space-y-2">
-          <Clock className="w-8 h-8 text-slate-300 mx-auto" />
-          <p className="text-sm font-semibold text-slate-700">No withdrawal records</p>
-          <p className="text-xs text-slate-400 max-w-xs mx-auto">
-            When you request a withdrawal, all status updates and order numbers will appear here.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredRecords.map((record) => (
+      {/* Record list */}
+      <div className="space-y-2.5">
+        {filteredRecords.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 shadow-xs">
+            <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-800">No Withdrawal Records Found</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Your requested payouts and settlement status will show here.
+            </p>
+          </div>
+        ) : (
+          filteredRecords.map((rec) => (
             <div
-              key={record.id}
-              className="bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs hover:shadow-xs transition-all space-y-3 animate-in fade-in duration-200"
+              key={rec.id}
+              className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
             >
-              {/* Top Row matching Frame 00:13 */}
-              <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Withdraw
-                </h3>
-                
-                {/* Status Badge */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-slate-900 font-mono">
+                    ₹{rec.amount.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-bold">
+                    {rec.method}
+                  </span>
+                </div>
+
                 <span
-                  className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-md tracking-wider uppercase ${
-                    record.status === 'PENDING'
-                      ? 'bg-amber-100/80 text-amber-700 border border-amber-200/60'
-                      : 'bg-emerald-100/80 text-emerald-700 border border-emerald-200/60'
+                  className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                    rec.status === 'SUCCESSFUL'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : rec.status === 'REJECTED'
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
                 >
-                  {record.status}
+                  {rec.status === 'SUCCESSFUL' ? 'SETTLED' : rec.status}
                 </span>
               </div>
 
-              {/* Details Key-Value Rows matching Frame 00:13 */}
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-normal">Balance</span>
-                  <span className="text-slate-900 font-bold">
-                    ₹{record.amount.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-normal">Type</span>
-                  <span className="text-slate-700 font-medium">
-                    {record.type}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-normal">Time</span>
-                  <span className="text-slate-600 font-mono text-[11px]">
-                    {record.time}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-slate-400 font-normal">Order number</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-slate-800 font-mono font-medium text-[11px] tracking-wider">
-                      {record.orderNumber}
-                    </span>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1 text-xs">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Beneficiary UPI:</span>
+                  <div className="flex items-center gap-1 font-mono font-bold text-slate-800">
+                    <span>{rec.upiId}</span>
                     <button
-                      onClick={() => handleCopy(record.orderNumber)}
-                      title="Copy order number"
-                      className="p-1 text-slate-400 hover:text-slate-600 rounded-sm"
+                      onClick={() => handleCopy(rec.upiId)}
+                      className="p-1 hover:text-indigo-600 cursor-pointer"
                     >
-                      {copiedId === record.orderNumber ? (
-                        <Check className="w-3 h-3 text-emerald-500" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
+                      {copiedId === rec.upiId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                     </button>
                   </div>
                 </div>
 
-                {record.upiId && (
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-50 pt-1.5">
-                    <span>Account / UPI</span>
-                    <span className="font-mono text-slate-500">{record.upiId}</span>
+                <div className="flex justify-between text-slate-500 text-[11px]">
+                  <span>Requested On:</span>
+                  <span>{rec.timestamp}</span>
+                </div>
+
+                {rec.bankReference && (
+                  <div className="flex justify-between text-emerald-700 font-mono text-[11px] pt-1 border-t border-slate-200">
+                    <span>Bank RRN:</span>
+                    <span>{rec.bankReference}</span>
                   </div>
                 )}
               </div>
-
-              {/* Simulate Approval helper for pending items */}
-              {record.status === 'PENDING' && onApproveRecord && (
-                <div className="pt-2 border-t border-slate-50 flex items-center justify-between">
-                  <span className="text-[10px] text-amber-600 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    Processing via bank switch...
-                  </span>
-                  <button
-                    onClick={() => onApproveRecord(record.id)}
-                    className="text-[10px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-sm transition-all"
-                  >
-                    Simulate Payout
-                  </button>
-                </div>
-              )}
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 };
