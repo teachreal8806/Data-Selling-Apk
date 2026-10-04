@@ -16,6 +16,8 @@ export interface WithdrawalRecord {
   time: string;
   status: 'PENDING' | 'SUCCESSFUL' | 'REJECTED';
   rejectionReason?: string;
+  bankReference?: string;
+  adminNotes?: string;
 }
 
 export interface UserAccount {
@@ -39,6 +41,13 @@ export interface UserAccount {
   requiredDepositAmount?: number;
   hasCompletedRequiredDeposit?: boolean;
   withdrawalDepositNotice?: string;
+  hasPaidAdsActivation?: boolean; // ₹199 payment required before watching ads
+  adsActivationUtr?: string;
+  hasPaidWithdrawalFee?: boolean; // ₹99 payment required before withdrawal
+  withdrawalFeeUtr?: string;
+  hasPaidSpeedTurbo?: boolean; // ₹99 payment required for fast data selling
+  speedTurboUtr?: string;
+  withdrawalCount?: number; // count of completed/initiated withdrawals (1st = min 250, 2nd+ = min 500)
 }
 
 export interface AuthLog {
@@ -104,6 +113,29 @@ export interface DepositGatewayConfig {
   instructions: string;
 }
 
+export interface SystemConfig {
+  sellingSpeedMs: number; // e.g. 4500 (slow)
+  mbPerPacketMin: number; // e.g. 0.15
+  mbPerPacketMax: number; // e.g. 0.45
+  ratePerMb: number; // e.g. 1.00
+  broadcastNotice?: string;
+  adRewardAmount: number; // e.g. 5.00
+  dailyAdLimit: number; // e.g. 10
+}
+
+export interface AdItem {
+  id: string;
+  title: string;
+  sponsor: string;
+  category: string;
+  rewardAmount: number;
+  durationSeconds: number;
+  tagline: string;
+  badge: string;
+  gradient: string;
+  iconName: string;
+}
+
 export type AppView = 
   | 'dashboard'
   | 'profile'
@@ -132,5 +164,12 @@ export interface UserState {
   requiredDepositAmount?: number;
   hasCompletedRequiredDeposit?: boolean;
   withdrawalDepositNotice?: string;
+  hasPaidAdsActivation?: boolean;
+  adsActivationUtr?: string;
+  hasPaidWithdrawalFee?: boolean;
+  withdrawalFeeUtr?: string;
+  hasPaidSpeedTurbo?: boolean;
+  speedTurboUtr?: string;
+  withdrawalCount?: number;
 }
 

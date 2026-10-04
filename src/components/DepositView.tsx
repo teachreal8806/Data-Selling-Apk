@@ -8,7 +8,6 @@ import {
   AlertCircle, 
   CheckCircle2, 
   ArrowRight,
-  ExternalLink,
   Sparkles,
   Smartphone,
   CreditCard,
@@ -46,12 +45,12 @@ export const DepositView: React.FC<DepositViewProps> = ({
 
   const numAmount = parseFloat(amount) || 0;
 
-  // Generate standard UPI URI for instant app launch
+  // Generate UPI URI
   const upiUri = `upi://pay?pa=${encodeURIComponent(depositConfig.upiId)}&pn=${encodeURIComponent(
     depositConfig.payeeName
   )}&am=${numAmount > 0 ? numAmount.toFixed(2) : '200.00'}&cu=INR&tn=DataSell_Deposit`;
 
-  // QR Code URL using high-res QR service
+  // QR Code URL
   const qrUrl = depositConfig.qrImageUrl || 
     `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(upiUri)}&margin=8`;
 
@@ -105,20 +104,20 @@ export const DepositView: React.FC<DepositViewProps> = ({
         <button
           onClick={onBack}
           id="btn-deposit-back"
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 py-1.5 px-3 rounded-xl hover:bg-slate-100 transition-all cursor-pointer min-h-[44px]"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-red-600 py-1.5 px-3 rounded-xl hover:bg-amber-100/50 transition-all cursor-pointer min-h-[44px]"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 text-red-600" />
           <span>Dashboard</span>
         </button>
 
-        <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-3 py-1 rounded-full">
-          <QrCode className="w-3.5 h-3.5 text-indigo-600" />
+        <div className="flex items-center gap-1.5 text-xs font-bold text-red-950 bg-amber-100 border border-amber-300 px-3 py-1 rounded-full shadow-xs">
+          <QrCode className="w-3.5 h-3.5 text-red-600" />
           <span>Instant UPI Deposit</span>
         </div>
 
         <button
           onClick={onGoToWithdraw}
-          className="text-xs font-bold text-slate-600 hover:text-indigo-600 py-1.5 px-2 transition-all cursor-pointer"
+          className="text-xs font-bold text-red-600 hover:text-red-800 py-1.5 px-2 transition-all cursor-pointer"
         >
           Withdrawal ➔
         </button>
@@ -126,26 +125,26 @@ export const DepositView: React.FC<DepositViewProps> = ({
 
       {submitted ? (
         /* Submission Success Confirmation */
-        <div className="bg-white rounded-3xl p-6 border border-emerald-200 shadow-md text-center space-y-4 animate-in zoom-in-95 duration-200">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mx-auto shadow-xs">
+        <div className="bg-white rounded-3xl p-6 border-2 border-amber-300 shadow-xl text-center space-y-4 animate-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-red-600 mx-auto shadow-xs">
             <CheckCircle2 className="w-9 h-9 text-emerald-600" />
           </div>
 
           <div className="space-y-1">
             <h3 className="text-lg font-black text-slate-900">Deposit Submitted!</h3>
             <p className="text-xs text-slate-600 max-w-xs mx-auto">
-              Your ₹{numAmount.toFixed(2)} deposit with UTR <span className="font-mono font-bold text-slate-900">{utrNumber}</span> has been received.
+              Your ₹{numAmount.toFixed(2)} deposit with UTR <span className="font-mono font-bold text-red-600">{utrNumber}</span> has been received.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left text-xs space-y-1.5">
+          <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200 text-left text-xs space-y-1.5">
             <div className="flex justify-between">
               <span className="text-slate-500">Gateway Status:</span>
-              <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">VERIFYING UTR</span>
+              <span className="text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">VERIFYING UTR</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Method:</span>
-              <span className="text-slate-800 font-medium">{method}</span>
+              <span className="text-slate-800 font-bold">{method}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Expected Time:</span>
@@ -156,7 +155,7 @@ export const DepositView: React.FC<DepositViewProps> = ({
           <div className="space-y-2 pt-2">
             <button
               onClick={onGoToWithdraw}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-bold text-xs shadow-md transition-all cursor-pointer border border-yellow-300"
             >
               Go to Withdraw Cash
             </button>
@@ -176,28 +175,25 @@ export const DepositView: React.FC<DepositViewProps> = ({
         <div className="space-y-4">
           {/* Instructions Notice Banner */}
           {userState.requireDepositBeforeWithdrawal && !userState.hasCompletedRequiredDeposit && (
-            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <div className="leading-relaxed">
-                <span className="font-bold">Required Verification Deposit:</span> A one-time deposit of ₹{userState.requiredDepositAmount || 200} is required to verify your UPI payment account and activate automated withdrawals.
+                <span className="font-black text-red-950">Required Verification Deposit:</span> A one-time deposit of ₹{userState.requiredDepositAmount || 200} is required to verify your UPI payment account and activate automated withdrawals.
               </div>
             </div>
           )}
 
-          {/* QR Code Card */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md text-center space-y-3 relative overflow-hidden">
+          {/* QR Code Card in Red & Yellow Theme */}
+          <div className="bg-white rounded-3xl p-5 border-2 border-amber-300 shadow-md text-center space-y-3 relative overflow-hidden">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-800">Scan & Pay Any UPI App</span>
-              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold border border-emerald-200">
+              <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold border border-emerald-300">
                 Auto-Verified 24/7
               </span>
             </div>
 
             {/* QR Scanner Container */}
-            <div className="relative mx-auto w-56 h-56 rounded-2xl bg-white p-3 border-2 border-indigo-200 shadow-inner flex items-center justify-center overflow-hidden">
-              {/* Animated laser line */}
-              <div className="absolute left-2 right-2 h-0.5 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)] animate-laser pointer-events-none" />
-
+            <div className="relative mx-auto w-56 h-56 rounded-2xl bg-white p-3 border-2 border-amber-300 shadow-inner flex items-center justify-center overflow-hidden">
               <img 
                 src={qrUrl} 
                 alt="UPI Deposit QR Code" 
@@ -207,18 +203,18 @@ export const DepositView: React.FC<DepositViewProps> = ({
             </div>
 
             {/* Payee Name & Official UPI ID */}
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="p-3 rounded-2xl bg-amber-50/50 border border-amber-200 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500">Payee:</span>
                 <span className="font-bold text-slate-900">{depositConfig.payeeName}</span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/80">
-                <span className="text-xs font-mono font-bold text-indigo-700 truncate">{depositConfig.upiId}</span>
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-amber-200/80">
+                <span className="text-xs font-mono font-bold text-red-700 truncate">{depositConfig.upiId}</span>
                 <button
                   id="btn-copy-upi-id"
                   onClick={handleCopyUpi}
-                  className="py-1 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all cursor-pointer shadow-xs"
+                  className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-red-600 to-amber-500 text-white text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all cursor-pointer shadow-xs border border-yellow-300"
                 >
                   {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                   <span>{copied ? 'Copied!' : 'Copy UPI'}</span>
@@ -226,35 +222,35 @@ export const DepositView: React.FC<DepositViewProps> = ({
               </div>
             </div>
 
-            {/* 1-Tap Launch in Mobile Apps */}
+            {/* 1-Tap Launch in Mobile Apps in Red & Yellow Theme (No blue) */}
             <div className="space-y-1.5 pt-1">
               <p className="text-[11px] text-slate-500 font-medium">Or pay instantly via your preferred UPI app:</p>
               <div className="grid grid-cols-4 gap-2">
                 <a
                   href={upiUri}
                   onClick={() => setMethod('PhonePe')}
-                  className="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
+                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
                 >
                   PhonePe
                 </a>
                 <a
                   href={upiUri}
                   onClick={() => setMethod('GPay')}
-                  className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
+                  className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-900 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
                 >
                   GPay
                 </a>
                 <a
                   href={upiUri}
                   onClick={() => setMethod('Paytm')}
-                  className="p-2 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-700 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
+                  className="p-2 rounded-xl bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-950 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
                 >
                   Paytm
                 </a>
                 <a
                   href={upiUri}
                   onClick={() => setMethod('BHIM')}
-                  className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
+                  className="p-2 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-900 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
                 >
                   BHIM
                 </a>
@@ -263,8 +259,8 @@ export const DepositView: React.FC<DepositViewProps> = ({
           </div>
 
           {/* Deposit Form with Amount & UTR */}
-          <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-5 border-2 border-amber-300 shadow-md space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-wider text-red-950">
               Submit Payment Reference (UTR)
             </h4>
 
@@ -277,17 +273,17 @@ export const DepositView: React.FC<DepositViewProps> = ({
 
             {/* Quick Amount Chips */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-slate-700">Amount to Deposit (₹)</label>
+              <label className="block text-xs font-bold text-slate-800">Amount to Deposit (₹)</label>
               <div className="grid grid-cols-4 gap-2">
-                {[200, 500, 1000, 2000].map((val) => (
+                {[99, 199, 500, 1000].map((val) => (
                   <button
                     type="button"
                     key={val}
                     onClick={() => handleQuickAmount(val)}
                     className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all cursor-pointer font-mono border ${
                       amount === val.toString()
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white border-yellow-300 shadow-sm font-black'
+                        : 'bg-amber-50 text-slate-800 border-amber-200 hover:bg-amber-100'
                     }`}
                   >
                     ₹{val}
@@ -296,19 +292,19 @@ export const DepositView: React.FC<DepositViewProps> = ({
               </div>
               <input
                 type="number"
-                min={depositConfig.minDeposit}
+                min="50"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Enter deposit amount"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono font-bold text-slate-900 bg-white focus:outline-hidden focus:border-indigo-500"
+                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-amber-300 text-sm font-mono font-bold text-slate-900 bg-white focus:outline-hidden focus:border-red-500"
               />
             </div>
 
             {/* UTR Reference Input */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-slate-700">12-Digit UTR / UPI Reference No.</label>
-                <span className="text-[10px] text-slate-400">Found in payment receipt</span>
+                <label className="text-xs font-bold text-slate-800">12-Digit UTR / UPI Reference No.</label>
+                <span className="text-[10px] text-red-600 font-bold uppercase">Required</span>
               </div>
               <input
                 type="text"
@@ -317,19 +313,29 @@ export const DepositView: React.FC<DepositViewProps> = ({
                 value={utrNumber}
                 onChange={(e) => setUtrNumber(e.target.value)}
                 placeholder="e.g. 429182749102"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-900 bg-white focus:outline-hidden focus:border-indigo-500"
+                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-amber-300 text-sm font-mono font-bold text-slate-900 bg-white focus:outline-hidden focus:border-red-500"
               />
             </div>
 
-            {/* Submit Confirmation Button */}
-            <button
-              type="submit"
-              id="btn-submit-deposit-utr"
-              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Verify & Credit Deposit (₹{numAmount.toFixed(2)})</span>
-            </button>
+            {/* Action Buttons: Submit + Cancel */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="submit"
+                id="btn-submit-deposit-utr"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-sm shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2 border border-yellow-300"
+              >
+                <CheckCircle2 className="w-4 h-4 text-yellow-300" />
+                <span>Verify & Submit UTR (₹{numAmount.toFixed(2)})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onBack}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel & Return to Dashboard
+              </button>
+            </div>
           </form>
         </div>
       )}

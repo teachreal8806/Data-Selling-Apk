@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw, Trophy, User, Wifi } from 'lucide-react';
+import { Menu, RefreshCw, Trophy, User, Wifi, Flame } from 'lucide-react';
 
 interface HeaderProps {
   onOpenMenu: () => void;
@@ -22,35 +22,35 @@ export const Header: React.FC<HeaderProps> = ({
   const avatarLetter = userEmail ? userEmail.charAt(0).toUpperCase() : 'U';
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between bg-white/95 backdrop-blur-md px-3.5 sm:px-4 py-3 border-b border-slate-200 shadow-xs">
+    <header className="sticky top-0 z-30 flex items-center justify-between bg-white/95 backdrop-blur-md px-3.5 sm:px-4 py-3 border-b-2 border-amber-300 shadow-xs">
       {/* Left: Menu Toggle + Brand */}
       <div className="flex items-center gap-2.5">
         <button
           id="btn-open-sidebar"
           onClick={onOpenMenu}
           aria-label="Open navigation menu"
-          className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border border-slate-200/80 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
+          className="p-2 rounded-xl text-slate-700 hover:text-red-600 hover:bg-amber-100/60 active:scale-95 transition-all border border-amber-300 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-5 h-5 text-red-600" />
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-            <Wifi className="w-4 h-4 text-white stroke-[2.5]" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 via-rose-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-red-500/25 border border-yellow-300">
+            <Flame className="w-4 h-4 text-yellow-300 fill-yellow-300" />
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-base font-extrabold text-slate-900 tracking-tight">
-                Data<span className="text-indigo-600">Sell</span>
+              <span className="text-base font-black text-slate-900 tracking-tight">
+                Data<span className="text-red-600">Sell</span>
               </span>
               {isSelling && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-red-700 border border-amber-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
                   LIVE
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-slate-500 font-medium">Bandwidth Node</span>
+            <span className="text-[10px] text-amber-800 font-bold">5G Ultra Network</span>
           </div>
         </div>
       </div>
@@ -62,10 +62,10 @@ export const Header: React.FC<HeaderProps> = ({
           id="btn-header-leaderboard"
           onClick={onOpenLeaderboard}
           title="Top 1 to 10 High Earners"
-          className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs min-h-[44px]"
+          className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-100 to-yellow-100 hover:from-amber-200 hover:to-yellow-200 text-red-950 border border-amber-400 text-xs font-black transition-all active:scale-95 cursor-pointer shadow-xs min-h-[44px]"
         >
-          <Trophy className="w-3.5 h-3.5 text-amber-600 fill-amber-500 shrink-0" />
-          <span className="text-[11px] font-bold tracking-tight">Top 10</span>
+          <Trophy className="w-3.5 h-3.5 text-red-600 fill-yellow-400 shrink-0" />
+          <span className="text-[11px] font-black tracking-tight">Top 10</span>
         </button>
 
         {/* User Account / Profile */}
@@ -73,9 +73,9 @@ export const Header: React.FC<HeaderProps> = ({
           id="btn-header-auth"
           onClick={onOpenAuth}
           title="User Account & Security"
-          className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 transition-all flex items-center justify-center font-bold text-xs active:scale-95 cursor-pointer min-h-[44px] min-w-[44px] shadow-xs"
+          className="w-10 h-10 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-slate-700 transition-all flex items-center justify-center font-bold text-xs active:scale-95 cursor-pointer min-h-[44px] min-w-[44px] shadow-xs"
         >
-          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
+          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-600 to-amber-500 flex items-center justify-center text-yellow-200 text-xs font-black shadow-xs border border-yellow-300/40">
             {avatarLetter}
           </span>
         </button>
@@ -85,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
           id="btn-quick-reset"
           onClick={onReset}
           title="Reset to 0"
-          className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
+          className="p-2 rounded-xl text-slate-500 hover:text-red-600 hover:bg-amber-100/50 border border-amber-200 transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
         >
           <RefreshCw className="w-4 h-4" />
         </button>

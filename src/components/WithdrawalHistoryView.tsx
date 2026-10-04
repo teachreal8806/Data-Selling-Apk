@@ -6,17 +6,24 @@ interface WithdrawalHistoryViewProps {
   records: WithdrawalRecord[];
   onBack: () => void;
   onApproveRecord?: (id: string) => void;
+  currentUserEmail?: string;
 }
 
 export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
   records,
   onBack,
   onApproveRecord,
+  currentUserEmail,
 }) => {
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'SUCCESSFUL'>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const filteredRecords = records.filter((rec) => {
+  // Filter strictly by the current user's email so new mobile signups never see previous user history
+  const userSpecificRecords = currentUserEmail
+    ? records.filter((r) => r.userEmail?.toLowerCase() === currentUserEmail.toLowerCase())
+    : records;
+
+  const filteredRecords = userSpecificRecords.filter((rec) => {
     if (filter === 'ALL') return true;
     return rec.status === filter;
   });
@@ -34,9 +41,9 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
         <button
           onClick={onBack}
           id="btn-history-back"
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 py-1.5 px-3 rounded-xl hover:bg-slate-100 transition-all cursor-pointer min-h-[44px]"
+          className="flex items-center gap-1.5 text-xs font-bold text-red-700 hover:text-red-800 py-1.5 px-3 rounded-xl hover:bg-amber-100/60 transition-all cursor-pointer min-h-[44px]"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 text-red-600" />
           <span>Dashboard</span>
         </button>
 
@@ -45,30 +52,30 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
         </h2>
 
         <div className="w-16 flex justify-end">
-          <span className="text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
-            {records.length}
+          <span className="text-[11px] font-mono font-bold text-red-700 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
+            {userSpecificRecords.length}
           </span>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex rounded-2xl bg-slate-100 p-1 text-xs font-bold border border-slate-200">
+      <div className="flex rounded-2xl bg-amber-50/70 p-1 text-xs font-bold border border-amber-200">
         <button
           onClick={() => setFilter('ALL')}
           className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
             filter === 'ALL'
-              ? 'bg-white text-indigo-700 font-extrabold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white font-black shadow-xs'
+              : 'text-slate-700 hover:text-red-700'
           }`}
         >
-          All ({records.length})
+          All ({userSpecificRecords.length})
         </button>
         <button
           onClick={() => setFilter('PENDING')}
           className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
             filter === 'PENDING'
-              ? 'bg-white text-amber-700 font-extrabold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+              : 'text-slate-700 hover:text-red-700'
           }`}
         >
           Pending
@@ -77,8 +84,8 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
           onClick={() => setFilter('SUCCESSFUL')}
           className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
             filter === 'SUCCESSFUL'
-              ? 'bg-white text-emerald-700 font-extrabold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-emerald-600 text-white font-black shadow-xs'
+              : 'text-slate-700 hover:text-red-700'
           }`}
         >
           Settled

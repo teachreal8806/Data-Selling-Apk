@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, Lock, LogOut, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, Lock, LogOut, Sparkles, CheckCircle2, Flame } from 'lucide-react';
 import { UserState } from '../types';
 
 interface ProfileViewProps {
@@ -22,7 +22,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [upiId, setUpiId] = useState(userState.savedUpiId);
   const [isSaved, setIsSaved] = useState(false);
 
-  // Hidden 10-tap trigger for Master Admin Panel (silent, no passwords or indicators shown)
+  // Hidden 10-tap trigger for Master Admin Panel
   const [tapCount, setTapCount] = useState(0);
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -31,7 +31,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       const next = prev + 1;
       if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
 
-      // Reset count after 3.5 seconds of inactivity
       tapTimerRef.current = setTimeout(() => {
         setTapCount(0);
       }, 3500);
@@ -68,9 +67,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <button
           onClick={onBack}
           id="btn-profile-back"
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 py-1.5 px-3 rounded-xl hover:bg-slate-100 transition-all cursor-pointer min-h-[44px]"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-red-600 py-1.5 px-3 rounded-xl hover:bg-amber-100/50 transition-all cursor-pointer min-h-[44px]"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 text-red-600" />
           <span>Dashboard</span>
         </button>
         <h2 
@@ -78,20 +77,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           className="text-sm font-extrabold text-slate-900 cursor-pointer select-none"
           title="Account Profile"
         >
-          Node Profile
+          Account Profile
         </h2>
         <div className="w-12" />
       </div>
 
-      {/* Digital VIP Pass Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 border border-indigo-400 p-5 shadow-xl shadow-indigo-600/20 text-white space-y-4">
-        <div className="absolute inset-0 royal-sheen pointer-events-none" />
+      {/* Digital VIP Pass Card in Red & Yellow Theme */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-amber-500 border-2 border-yellow-300 p-5 shadow-xl shadow-red-600/20 text-white space-y-4">
+        <div className="absolute top-0 right-0 w-36 h-36 bg-yellow-300/20 rounded-full blur-2xl pointer-events-none" />
         
         <div className="relative z-10 flex items-center gap-3.5">
           <div 
             id="profile-avatar-secret-trigger"
             onClick={handleSecretAdminTap}
-            className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-2xl text-white border border-white/30 cursor-pointer active:scale-95 transition-transform select-none shadow-sm shrink-0"
+            className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-2xl text-yellow-200 border border-yellow-200/50 cursor-pointer active:scale-95 transition-transform select-none shadow-sm shrink-0"
             title="Profile"
           >
             {avatarLetter}
@@ -101,73 +100,73 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="select-none cursor-pointer flex-1 min-w-0"
           >
             <div className="flex items-center gap-1.5">
-              <h3 className="text-base font-black truncate">{email || 'User Account'}</h3>
-              <CheckCircle2 className="w-4 h-4 text-cyan-300 shrink-0" />
+              <h3 className="text-base font-black truncate text-white">{email || 'User Account'}</h3>
+              <CheckCircle2 className="w-4 h-4 text-yellow-300 shrink-0" />
             </div>
-            <p className="text-xs text-indigo-100 font-mono mt-0.5">{phone || '+91 User Connected'}</p>
+            <p className="text-xs text-yellow-100 font-mono mt-0.5">{phone || '+91 User Connected'}</p>
           </div>
         </div>
 
         {/* Status Chips */}
         <div className="relative z-10 pt-3 border-t border-white/20 grid grid-cols-2 gap-2 text-center text-xs">
-          <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2 border border-white/15">
-            <span className="text-[10px] text-indigo-200 block uppercase font-bold">Node Tier</span>
-            <span className="font-black text-amber-200">{userState.tier} VIP NODE</span>
+          <div className="bg-white/15 backdrop-blur-xs rounded-xl p-2 border border-white/20">
+            <span className="text-[10px] text-yellow-100 block uppercase font-bold">Node Tier</span>
+            <span className="font-black text-yellow-200">{userState.tier} VIP ELITE</span>
           </div>
-          <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2 border border-white/15">
-            <span className="text-[10px] text-indigo-200 block uppercase font-bold">Total Bandwidth</span>
-            <span className="font-black font-mono text-cyan-200">{userState.totalSoldMB.toFixed(2)} MB</span>
+          <div className="bg-white/15 backdrop-blur-xs rounded-xl p-2 border border-white/20">
+            <span className="text-[10px] text-yellow-100 block uppercase font-bold">Total Bandwidth</span>
+            <span className="font-black font-mono text-white">{userState.totalSoldMB.toFixed(2)} MB</span>
           </div>
         </div>
       </div>
 
       {/* Editable Account Profile Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+      <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-5 border-2 border-amber-200 shadow-md space-y-4">
+        <h3 className="text-xs font-black uppercase tracking-wider text-red-950">
           Payout Account & Credentials
         </h3>
 
         {/* Email */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700">Account Email Address</label>
-          <div className="relative rounded-xl border border-slate-200 focus-within:border-indigo-500 bg-white">
+          <label className="block text-xs font-bold text-slate-700">Account Email Address</label>
+          <div className="relative rounded-xl border-2 border-amber-200 focus-within:border-red-500 bg-white">
             <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 bg-transparent focus:outline-hidden"
+              className="w-full pl-10 pr-3.5 py-2.5 text-xs font-bold text-slate-900 bg-transparent focus:outline-hidden font-mono"
             />
           </div>
         </div>
 
         {/* Phone */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700">Registered Mobile Number</label>
-          <div className="relative rounded-xl border border-slate-200 focus-within:border-indigo-500 bg-white">
+          <label className="block text-xs font-bold text-slate-700">Registered Mobile Number</label>
+          <div className="relative rounded-xl border-2 border-amber-200 focus-within:border-red-500 bg-white">
             <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+91 XXXXX XXXXX"
-              className="w-full pl-10 pr-3.5 py-2.5 text-xs font-mono text-slate-900 bg-transparent focus:outline-hidden"
+              className="w-full pl-10 pr-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 bg-transparent focus:outline-hidden"
             />
           </div>
         </div>
 
         {/* Default UPI ID */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700">Default Payout UPI ID</label>
-          <div className="relative rounded-xl border border-slate-200 focus-within:border-indigo-500 bg-white">
+          <label className="block text-xs font-bold text-slate-700">Default Payout UPI ID</label>
+          <div className="relative rounded-xl border-2 border-amber-200 focus-within:border-red-500 bg-white">
             <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={upiId}
               onChange={(e) => setUpiId(e.target.value)}
               placeholder="e.g. yourname@oksbi"
-              className="w-full pl-10 pr-3.5 py-2.5 text-xs font-mono text-slate-900 bg-transparent focus:outline-hidden"
+              className="w-full pl-10 pr-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 bg-transparent focus:outline-hidden"
             />
           </div>
         </div>
@@ -175,16 +174,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {/* Save Button */}
         <button
           type="submit"
-          className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-extrabold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 border border-yellow-300 min-h-[44px]"
         >
-          {isSaved ? <Check className="w-4 h-4 text-emerald-300" /> : <Save className="w-4 h-4" />}
+          {isSaved ? <Check className="w-4 h-4 text-yellow-300" /> : <Save className="w-4 h-4 text-yellow-300" />}
           <span>{isSaved ? 'Settings Saved Successfully!' : 'Save Profile Changes'}</span>
         </button>
       </form>
 
       {/* Logout Action */}
       {onLogout && (
-        <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white rounded-3xl p-4 border border-amber-200 shadow-sm flex items-center justify-between">
           <div>
             <h4 className="text-xs font-bold text-slate-800">Session Security</h4>
             <p className="text-[11px] text-slate-500">Sign out of this device to protect your account</p>

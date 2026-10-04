@@ -41,10 +41,12 @@ import {
   DepositRecord,
   SupportConfig,
   SupportTicket,
-  DepositGatewayConfig
+  DepositGatewayConfig,
+  SystemConfig
 } from '../types';
 import { formatDateTime } from '../utils';
 import { AdminLogin } from './AdminLogin';
+import { api } from '../api';
 
 interface AdminPanelProps {
   onBackToUserView: () => void;
@@ -65,15 +67,27 @@ interface AdminPanelProps {
   onUpdateTickets?: (tickets: SupportTicket[]) => void;
   depositConfig?: DepositGatewayConfig;
   onUpdateDepositConfig?: (config: DepositGatewayConfig) => void;
+  systemConfig?: SystemConfig;
+  onUpdateSystemConfig?: (config: SystemConfig) => void;
 }
 
-type AdminTab = 'users' | 'deposits' | 'withdrawals' | 'leaderboard' | 'logs' | 'support';
+type AdminTab = 'users' | 'deposits' | 'withdrawals' | 'leaderboard' | 'logs' | 'support' | 'settings';
+
+const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
+  sellingSpeedMs: 4500, // Slow, realistic bandwidth streaming as requested
+  mbPerPacketMin: 0.15,
+  mbPerPacketMax: 0.45,
+  ratePerMb: 1.00,
+  broadcastNotice: '',
+  adRewardAmount: 5.00,
+  dailyAdLimit: 10,
+};
 
 const DEFAULT_SUPPORT_CONFIG: SupportConfig = {
   whatsappNumber: '+91 9823537634',
   email: 'techreal8806@gmail.com',
-  telegramLink: 'https://t.me/datasell_official',
-  telegramHandle: '@datasell_official',
+  telegramLink: '',
+  telegramHandle: '',
   notice: '24/7 Priority desk for withdrawals, verification deposits, and bandwidth support.',
 };
 
@@ -104,6 +118,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onUpdateTickets,
   depositConfig = DEFAULT_DEPOSIT_CONFIG,
   onUpdateDepositConfig,
+  systemConfig = DEFAULT_SYSTEM_CONFIG,
+  onUpdateSystemConfig,
 }) => {
   // Admin Authentication State
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
@@ -142,6 +158,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editSupportNotice, setEditSupportNotice] = useState(supportConfig.notice);
   const [supportSavedNotice, setSupportSavedNotice] = useState(false);
 
+  // Editable System Speed & Rates Form
+  const [editSpeedMs, setEditSpeedMs] = useState(systemConfig.sellingSpeedMs.toString());
+  const [editRatePerMb, setEditRatePerMb] = useState(systemConfig.ratePerMb.toString());
+  const [editAdReward, setEditAdReward] = useState(systemConfig.adRewardAmount.toString());
+  const [editBroadcastNotice, setEditBroadcastNotice] = useState(systemConfig.broadcastNotice || '');
+  const [settingsSavedNotice, setSettingsSavedNotice] = useState(false);
+  const [isSyncingLive, setIsSyncingLive] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'ads_199' | 'withdrawal_99' | 'turbo_99' | 'deposits'>('all');
+
+  // Synchronize all data across all mobile devices
+  const handleSyncLive = async () => {
+    setIsSyncingLive(true);
+    try {
+      const data = await api.getAdminAllData();
+      if (data) {
+        if (data.users) onUpdateUsers(data.users);
+        if (data.withdrawals) onUpdateWithdrawals(data.withdrawals);
+        if (data.deposits && onUpdateDeposits) onUpdateDeposits(data.deposits);
+        if (data.topEarners) onUpdateTopEarners(data.topEarners);
+        if (data.systemConfig && onUpdateSystemConfig) onUpdateSystemConfig(data.systemConfig);
+        if (data.depositConfig && onUpdateDepositConfig) onUpdateDepositConfig(data.depositConfig);
+        if (data.supportConfig && onUpdateSupportConfig) onUpdateSupportConfig(data.supportConfig);
+        if (data.supportTickets && onUpdateTickets) onUpdateTickets(data.supportTickets);
+      }
+    } catch (err) {
+      console.error('Error syncing live data', err);
+    } finally {
+      setTimeout(() => setIsSyncingLive(false), 400);
+    }
+  };
+
+  // Periodic auto-sync every 4s to track signups & withdrawals from all mobiles in real-time
+  React.useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    handleSyncLive();
+    const interval = setInterval(handleSyncLive, 4000);
+    return () => clearInterval(interval);
+  }, [isAdminAuthenticated]);
+
   if (!isAdminAuthenticated) {
     return (
       <AdminLogin
@@ -163,30 +218,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // User Management Handlers
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
 
     const updated = users.map((u) => (u.id === editingUser.id ? editingUser : u));
     onUpdateUsers(updated);
+    await api.updateUser(editingUser);
     setEditingUser(null);
   };
 
-  const handleToggleUserStatus = (userId: string) => {
+  const handleToggleUserStatus = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    const nextStatus: 'ACTIVE' | 'BLOCKED' = target.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
     const updated = users.map((u) => {
       if (u.id === userId) {
-        const nextStatus: 'ACTIVE' | 'BLOCKED' = u.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
         return { ...u, status: nextStatus };
       }
       return u;
     });
     onUpdateUsers(updated);
+    await api.updateUser({ id: userId, status: nextStatus });
   };
 
-  const handleToggleUserDepositReq = (userId: string) => {
+  const handleToggleUserDepositReq = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    const nextVal = !target.requireDepositBeforeWithdrawal;
     const updated = users.map((u) => {
       if (u.id === userId) {
-        const nextVal = !u.requireDepositBeforeWithdrawal;
         return { 
           ...u, 
           requireDepositBeforeWithdrawal: nextVal,
@@ -197,22 +258,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return u;
     });
     onUpdateUsers(updated);
+    await api.updateUser({ 
+      id: userId, 
+      requireDepositBeforeWithdrawal: nextVal, 
+      requiredDepositAmount: target.requiredDepositAmount || 200,
+      hasCompletedRequiredDeposit: false 
+    });
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       onUpdateUsers(users.filter((u) => u.id !== userId));
+      await api.deleteUser(userId);
     }
   };
 
   // User Deposit Approval & Rejection Handlers
-  const handleApproveUserDeposit = (deposit: DepositRecord) => {
-    // 1. Credit balance and unlock withdrawal
+  const handleApproveUserDeposit = async (deposit: DepositRecord) => {
+    const isAds = deposit.amount === 199 || (deposit.note && deposit.note.toLowerCase().includes('ads'));
+    const isWithdrawalFee = deposit.amount === 99 && (deposit.note && deposit.note.toLowerCase().includes('withdrawal'));
+    const isSpeedTurbo = deposit.amount === 99 && (deposit.note && (deposit.note.toLowerCase().includes('speed') || deposit.note.toLowerCase().includes('turbo')));
+
+    // 1. Credit balance or unlock appropriate feature
     const updatedUsers = users.map((u) => {
       if (u.email.toLowerCase() === deposit.userEmail.toLowerCase()) {
         return {
           ...u,
-          balance: parseFloat((u.balance + deposit.amount).toFixed(2)),
+          balance: (!isAds && !isWithdrawalFee && !isSpeedTurbo)
+            ? parseFloat((u.balance + deposit.amount).toFixed(2))
+            : u.balance,
+          hasPaidAdsActivation: isAds ? true : u.hasPaidAdsActivation,
+          adsActivationUtr: isAds ? deposit.utrNumber : u.adsActivationUtr,
+          hasPaidWithdrawalFee: isWithdrawalFee ? true : u.hasPaidWithdrawalFee,
+          withdrawalFeeUtr: isWithdrawalFee ? deposit.utrNumber : u.withdrawalFeeUtr,
+          hasPaidSpeedTurbo: isSpeedTurbo ? true : u.hasPaidSpeedTurbo,
+          speedTurboUtr: isSpeedTurbo ? deposit.utrNumber : u.speedTurboUtr,
           hasCompletedRequiredDeposit: true,
         };
       }
@@ -226,14 +306,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         deposits.map((d) => (d.id === deposit.id ? { ...d, status: 'COMPLETED' } : d))
       );
     }
+
+    await api.updateDeposit({ id: deposit.id, status: 'COMPLETED' });
+    const targetUser = updatedUsers.find((u) => u.email.toLowerCase() === deposit.userEmail.toLowerCase());
+    if (targetUser) {
+      await api.updateUser(targetUser);
+    }
   };
 
-  const handleRejectUserDeposit = (depositId: string) => {
+  const handleRejectUserDeposit = async (depositId: string) => {
     if (onUpdateDeposits) {
       onUpdateDeposits(
         deposits.map((d) => (d.id === depositId ? { ...d, status: 'REJECTED' } : d))
       );
     }
+    await api.updateDeposit({ id: depositId, status: 'REJECTED' });
   };
 
   const handleSaveGatewayConfig = (e: React.FormEvent) => {
@@ -315,18 +402,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     onUpdateUsers(updatedUsers);
     onAddDeposit(newDeposit);
+    api.creditUser({
+      userId: targetUser.id,
+      amount: numAmount,
+      type: depositType,
+      note: depositNote,
+    });
     setDepositSuccessMsg(`Successfully deposited ₹${numAmount.toFixed(2)} to ${targetUser.email}!`);
     setTimeout(() => setDepositSuccessMsg(null), 4000);
   };
 
   // Withdrawal Handlers
-  const handleApproveWithdrawal = (id: string) => {
+  const handleApproveWithdrawal = async (id: string) => {
+    const generatedRrn = `UPI/${Math.floor(100000000000 + Math.random() * 900000000000)}`;
+    const rrn = prompt('Enter Bank / UPI Settlement RRN Reference:', generatedRrn) || generatedRrn;
+
     onUpdateWithdrawals(
-      withdrawals.map((w) => (w.id === id ? { ...w, status: 'SUCCESSFUL' } : w))
+      withdrawals.map((w) => (w.id === id ? { ...w, status: 'SUCCESSFUL', bankReference: rrn } : w))
     );
+
+    await api.updateWithdrawal({
+      id,
+      status: 'SUCCESSFUL',
+      bankReference: rrn,
+    });
   };
 
-  const handleRejectWithdrawal = (record: WithdrawalRecord) => {
+  const handleRejectWithdrawal = async (record: WithdrawalRecord) => {
     const reason = prompt('Enter reason for rejection (balance will be refunded):', 'Invalid UPI ID or Bank Server Timeout');
     if (reason === null) return;
 
@@ -334,7 +436,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (record.userEmail) {
       onUpdateUsers(
         users.map((u) => {
-          if (u.email === record.userEmail) {
+          if (u.email.toLowerCase() === record.userEmail?.toLowerCase()) {
             return {
               ...u,
               balance: parseFloat((u.balance + record.amount).toFixed(2)),
@@ -352,6 +454,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           : w
       )
     );
+
+    await api.updateWithdrawal({
+      id: record.id,
+      status: 'REJECTED',
+      rejectionReason: reason,
+    });
+  };
+
+  // Save Data Selling Speed, Rate, and Global Broadcast Notice
+  const handleSaveSystemSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const speed = parseInt(editSpeedMs, 10) || 4500;
+    const rate = parseFloat(editRatePerMb) || 1.00;
+    const adReward = parseFloat(editAdReward) || 5.00;
+
+    const newConfig: SystemConfig = {
+      sellingSpeedMs: speed,
+      mbPerPacketMin: speed >= 5000 ? 0.10 : 0.15,
+      mbPerPacketMax: speed >= 5000 ? 0.30 : 0.45,
+      ratePerMb: rate,
+      broadcastNotice: editBroadcastNotice.trim(),
+      adRewardAmount: adReward,
+      dailyAdLimit: 10,
+    };
+
+    if (onUpdateSystemConfig) {
+      onUpdateSystemConfig(newConfig);
+    }
+
+    await api.updateSystemConfig({ systemConfig: newConfig });
+    setSettingsSavedNotice(true);
+    setTimeout(() => setSettingsSavedNotice(false), 3000);
   };
 
   // Leaderboard Control Handlers
@@ -417,6 +551,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </a>
 
           <button
+            onClick={handleSyncLive}
+            title="Sync all connected mobiles in real-time"
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-indigo-600/90 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingLive ? 'animate-spin text-cyan-300' : ''}`} />
+            <span className="hidden sm:inline">Sync All Mobiles</span>
+          </button>
+
+          <button
             onClick={handleAdminLogout}
             className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-800/60 text-xs font-semibold transition-all cursor-pointer"
             title="Lock Admin Panel"
@@ -462,37 +605,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       <div className="bg-slate-950 border-b border-slate-800 px-4 flex gap-1 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
+          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'users'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
               : 'text-slate-400 border-transparent hover:text-slate-200'
           }`}
         >
-          <Users className="w-4 h-4" />
+          <Users className="w-4 h-4 text-amber-400" />
           <span>User Control ({users.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('deposits')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
+          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'deposits'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
               : 'text-slate-400 border-transparent hover:text-slate-200'
           }`}
         >
-          <Wallet className="w-4 h-4" />
-          <span>Deposit & Scanner Control</span>
+          <Wallet className="w-4 h-4 text-amber-400" />
+          <span>Payment & UTR Desk</span>
         </button>
 
         <button
           onClick={() => setActiveTab('withdrawals')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
+          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'withdrawals'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
               : 'text-slate-400 border-transparent hover:text-slate-200'
           }`}
         >
-          <ArrowDownToLine className="w-4 h-4" />
+          <ArrowDownToLine className="w-4 h-4 text-amber-400" />
           <span>Withdrawals ({withdrawals.length})</span>
           {pendingWithdrawalsCount > 0 && (
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
@@ -501,41 +644,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
         <button
           onClick={() => setActiveTab('leaderboard')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
+          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'leaderboard'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
               : 'text-slate-400 border-transparent hover:text-slate-200'
           }`}
         >
-          <Trophy className="w-4 h-4" />
+          <Trophy className="w-4 h-4 text-amber-400" />
           <span>Top 1-10 Earners Control</span>
         </button>
 
         <button
           onClick={() => setActiveTab('logs')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
+          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'logs'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
               : 'text-slate-400 border-transparent hover:text-slate-200'
           }`}
         >
-          <Activity className="w-4 h-4" />
+          <Activity className="w-4 h-4 text-amber-400" />
           <span>Login & Signup Logs ({authLogs.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('support')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
+          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'support'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
               : 'text-slate-400 border-transparent hover:text-slate-200'
           }`}
         >
-          <LifeBuoy className="w-4 h-4" />
-          <span>Support & Telegram Control</span>
+          <LifeBuoy className="w-4 h-4 text-amber-400" />
+          <span>Support & Tickets Desk</span>
           {supportTickets.filter((t) => t.status === 'NEW').length > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'settings'
+              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
+              : 'text-slate-400 border-transparent hover:text-slate-200'
+          }`}
+        >
+          <Sliders className="w-4 h-4 text-amber-400" />
+          <span>Speed & Master Controls</span>
         </button>
       </div>
 
@@ -829,91 +984,190 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </form>
             </div>
 
-            {/* User Submitted Deposits Verification Desk */}
+            {/* User Submitted Deposits & Feature Verification Desk */}
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-2.5 gap-2">
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-blue-400" />
-                    <span>User Deposit Verification Desk</span>
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <span>User Payment & Verification Gateways Desk</span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Review and approve user deposit requests with UTR / Reference IDs. Approving credits the user's wallet and unlocks their withdrawal requirement!
+                    Manage all ₹199 Video Ads, ₹99 Withdrawal Fees, ₹99 Turbo Speed activations & UPI deposits.
                   </p>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-mono font-bold">
-                  {deposits.length} Total
-                </span>
+
+                {/* Filter Tabs */}
+                <div className="flex flex-wrap items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentFilter('all')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      paymentFilter === 'all'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    All ({deposits.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentFilter('ads_199')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      paymentFilter === 'ads_199'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Ads ₹199 ({deposits.filter((d) => d.amount === 199 || (d.note && d.note.toLowerCase().includes('ads'))).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentFilter('withdrawal_99')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      paymentFilter === 'withdrawal_99'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Withdrawal ₹99 ({deposits.filter((d) => d.amount === 99 && (d.note && d.note.toLowerCase().includes('withdrawal'))).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentFilter('turbo_99')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      paymentFilter === 'turbo_99'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Turbo ₹99 ({deposits.filter((d) => d.amount === 99 && (d.note && (d.note.toLowerCase().includes('speed') || d.note.toLowerCase().includes('turbo')))).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentFilter('deposits')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      paymentFilter === 'deposits'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Deposits ({deposits.filter((d) => d.amount !== 199 && d.amount !== 99).length})
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
-                {deposits.length === 0 ? (
+              <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+                {deposits
+                  .filter((dep) => {
+                    const isAds = dep.amount === 199 || (dep.note && dep.note.toLowerCase().includes('ads'));
+                    const isWithdrawal = dep.amount === 99 && (dep.note && dep.note.toLowerCase().includes('withdrawal'));
+                    const isTurbo = dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')));
+
+                    if (paymentFilter === 'ads_199') return isAds;
+                    if (paymentFilter === 'withdrawal_99') return isWithdrawal;
+                    if (paymentFilter === 'turbo_99') return isTurbo;
+                    if (paymentFilter === 'deposits') return !isAds && !isWithdrawal && !isTurbo;
+                    return true;
+                  })
+                  .length === 0 ? (
                   <div className="text-center py-8 text-slate-500 text-xs">
-                    No deposit requests logged yet.
+                    No payment requests in this filter.
                   </div>
                 ) : (
-                  deposits.map((dep) => (
-                    <div
-                      key={dep.id}
-                      className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-xs">{dep.userEmail}</span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/20 text-blue-400">
-                            {dep.type}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              dep.status === 'COMPLETED'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : dep.status === 'PENDING'
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
-                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                            }`}
-                          >
-                            {dep.status}
-                          </span>
-                        </div>
+                  deposits
+                    .filter((dep) => {
+                      const isAds = dep.amount === 199 || (dep.note && dep.note.toLowerCase().includes('ads'));
+                      const isWithdrawal = dep.amount === 99 && (dep.note && dep.note.toLowerCase().includes('withdrawal'));
+                      const isTurbo = dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')));
 
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                          {dep.utrNumber && (
-                            <span className="font-mono text-emerald-300 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                              UTR: {dep.utrNumber}
-                            </span>
-                          )}
-                          <span className="truncate">{dep.note}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">{dep.time}</span>
-                        </div>
-                      </div>
+                      if (paymentFilter === 'ads_199') return isAds;
+                      if (paymentFilter === 'withdrawal_99') return isWithdrawal;
+                      if (paymentFilter === 'turbo_99') return isTurbo;
+                      if (paymentFilter === 'deposits') return !isAds && !isWithdrawal && !isTurbo;
+                      return true;
+                    })
+                    .map((dep) => {
+                      const isAds = dep.amount === 199 || (dep.note && dep.note.toLowerCase().includes('ads'));
+                      const isWithdrawal = dep.amount === 99 && (dep.note && dep.note.toLowerCase().includes('withdrawal'));
+                      const isTurbo = dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')));
 
-                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                        <span className="text-base font-extrabold text-emerald-400">
-                          ₹{dep.amount.toFixed(2)}
-                        </span>
+                      let purposeBadge = 'WALLET DEPOSIT';
+                      let badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+                      if (isAds) {
+                        purposeBadge = 'ADS UNLOCK ₹199';
+                        badgeColor = 'bg-red-500/20 text-red-300 border-red-500/30';
+                      } else if (isWithdrawal) {
+                        purposeBadge = 'WITHDRAWAL FEE ₹99';
+                        badgeColor = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+                      } else if (isTurbo) {
+                        purposeBadge = 'TURBO SPEED ₹99';
+                        badgeColor = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+                      }
 
-                        {dep.status === 'PENDING' && (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleRejectUserDeposit(dep.id)}
-                              className="py-1 px-2.5 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleApproveUserDeposit(dep)}
-                              className="py-1 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Approve & Unlock</span>
-                            </button>
+                      return (
+                        <div
+                          key={dep.id}
+                          className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-all"
+                        >
+                          <div className="space-y-1.5 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-white text-xs">{dep.userEmail}</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black border uppercase ${badgeColor}`}>
+                                {purposeBadge}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  dep.status === 'COMPLETED'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                    : dep.status === 'PENDING'
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
+                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                }`}
+                              >
+                                {dep.status}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                              {dep.utrNumber && (
+                                <span className="font-mono text-yellow-300 font-black bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded">
+                                  UTR: {dep.utrNumber}
+                                </span>
+                              )}
+                              <span className="truncate">{dep.note}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">{dep.time}</span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  ))
+
+                          <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                            <span className="text-base font-extrabold text-amber-400 font-mono">
+                              ₹{dep.amount.toFixed(2)}
+                            </span>
+
+                            {dep.status === 'PENDING' && (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRejectUserDeposit(dep.id)}
+                                  className="py-1 px-2.5 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer"
+                                >
+                                  Reject
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveUserDeposit(dep)}
+                                  className="py-1 px-3 rounded-lg bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1 border border-yellow-300"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-yellow-300" />
+                                  <span>Approve & Unlock</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
                 )}
               </div>
             </div>
@@ -1627,6 +1881,149 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
         )}
+
+        {/* ==================== TAB 7: SPEED & MASTER CONTROLS ==================== */}
+        {activeTab === 'settings' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-blue-400" />
+                  <span>Bandwidth Selling Speed & Master Central Controls</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Control bandwidth streaming speed, rates, ad rewards, and instant global broadcast alerts for all mobile devices.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSyncLive}
+                className="py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingLive ? 'animate-spin' : ''}`} />
+                <span>Sync Mobiles</span>
+              </button>
+            </div>
+
+            {settingsSavedNotice && (
+              <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span className="font-bold">Settings applied successfully! All connected mobiles updated in real-time.</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSystemSettings} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Selling Speed Controller ("data selling thoda or slow kar dijiye sir") */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Data Selling Speed (Streaming Interval)</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    Sets how gradually packets and earnings stream into user wallets.
+                  </p>
+                  <select
+                    value={editSpeedMs}
+                    onChange={(e) => setEditSpeedMs(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-semibold focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="6000">Very Slow (6.0 seconds per packet) - Maximum Stability</option>
+                    <option value="4500">Slow & Steady (4.5 seconds per packet) - [Recommended by User]</option>
+                    <option value="3000">Moderate (3.0 seconds per packet)</option>
+                    <option value="1800">Fast (1.8 seconds per packet)</option>
+                  </select>
+                </div>
+
+                {/* Network Rate per MB */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Rupee Rate per 1 MB Sold</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    Payout credited per MB transferred (e.g. ₹1.00 = 500MB earns ₹500).
+                  </p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={editRatePerMb}
+                      onChange={(e) => setEditRatePerMb(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-emerald-400 font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Sponsored Video Ad Cash Reward */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Sponsored Video Ad Cash Reward (₹)</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    Direct cash bonus credited when user watches a 10s sponsored video ad.
+                  </p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
+                    <input
+                      type="number"
+                      step="0.5"
+                      required
+                      value={editAdReward}
+                      onChange={(e) => setEditAdReward(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-300 font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Global Mobile Broadcast Notice */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Global Mobile Broadcast Announcement</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    Displays an instant alert banner on all connected mobile user dashboards.
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="e.g. Instant automated ₹500 UPI withdrawals live now! Watch ads to boost earnings."
+                    value={editBroadcastNotice}
+                    onChange={(e) => setEditBroadcastNotice(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Master Status Strip */}
+              <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-slate-300 font-medium">
+                    Centralized Cloud Master Active: <strong className="text-white">{users.length} Mobiles Registered</strong>
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  Sync Interval: 4.0s (Auto-Polling)
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="submit"
+                  className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Save & Apply Master Controls to All Mobiles</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* ==================== MODAL 1: EDIT USER MODAL ==================== */}
@@ -1679,21 +2076,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Wallet Balance (₹)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    value={editingUser.balance}
-                    onChange={(e) =>
-                      setEditingUser({ ...editingUser, balance: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-emerald-400"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Account Password (Admin View & Edit)</label>
+                <input
+                  type="text"
+                  value={editingUser.password || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                  placeholder="Enter user password"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-amber-300 font-mono"
+                />
+              </div>
 
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs text-slate-400">Wallet Balance (₹)</label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingUser({ ...editingUser, balance: Math.max(0, editingUser.balance - 100) })}
+                      className="px-1.5 py-0.5 rounded text-[10px] bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900 cursor-pointer"
+                    >
+                      -₹100
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingUser({ ...editingUser, balance: editingUser.balance + 100 })}
+                      className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer"
+                    >
+                      +₹100
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingUser({ ...editingUser, balance: editingUser.balance + 250 })}
+                      className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer"
+                    >
+                      +₹250
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingUser({ ...editingUser, balance: editingUser.balance + 500 })}
+                      className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer"
+                    >
+                      +₹500
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={editingUser.balance}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, balance: parseFloat(e.target.value) || 0 })
+                  }
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-black text-amber-300 font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Bandwidth Sold (MB)</label>
                   <input
@@ -1703,9 +2143,97 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) =>
                       setEditingUser({ ...editingUser, totalSoldMB: parseFloat(e.target.value) || 0 })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-blue-400 font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Withdrawals Done (Count)</label>
+                  <select
+                    value={(editingUser.withdrawalCount || 0) === 0 ? '0' : '1'}
+                    onChange={(e) => setEditingUser({ ...editingUser, withdrawalCount: parseInt(e.target.value, 10) })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-amber-300 font-bold"
+                  >
+                    <option value="0">0 (1st Payout • Min ₹250)</option>
+                    <option value="1">1+ (2nd+ Payout • Min ₹500)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Feature Activations & UTR Controls */}
+              <div className="p-3 bg-slate-950/90 rounded-xl border border-slate-800 space-y-2.5">
+                <span className="text-xs font-black text-amber-400 uppercase tracking-wider block">
+                  User Payment & Feature Unlocks
+                </span>
+
+                {/* 1. ₹199 Video Ads Unlock */}
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800">
+                  <div>
+                    <span className="text-white font-bold block">₹199 Video Ads Monetization</span>
+                    <span className="text-[10px] text-slate-400">Allows user to watch ads and earn</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={editingUser.hasPaidAdsActivation || false}
+                    onChange={(e) => setEditingUser({ ...editingUser, hasPaidAdsActivation: e.target.checked })}
+                    className="w-4 h-4 rounded text-red-600 cursor-pointer"
+                  />
+                </div>
+                {editingUser.hasPaidAdsActivation && (
+                  <input
+                    type="text"
+                    value={editingUser.adsActivationUtr || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, adsActivationUtr: e.target.value })}
+                    placeholder="Ads Activation 12-digit UTR"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono"
+                  />
+                )}
+
+                {/* 2. ₹99 Withdrawal Verification Fee */}
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
+                  <div>
+                    <span className="text-white font-bold block">₹99 Withdrawal Verification Fee</span>
+                    <span className="text-[10px] text-slate-400">Unlocks bank payout request capability</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={editingUser.hasPaidWithdrawalFee || false}
+                    onChange={(e) => setEditingUser({ ...editingUser, hasPaidWithdrawalFee: e.target.checked })}
+                    className="w-4 h-4 rounded text-red-600 cursor-pointer"
+                  />
+                </div>
+                {editingUser.hasPaidWithdrawalFee && (
+                  <input
+                    type="text"
+                    value={editingUser.withdrawalFeeUtr || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, withdrawalFeeUtr: e.target.value })}
+                    placeholder="Withdrawal Fee 12-digit UTR"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono"
+                  />
+                )}
+
+                {/* 3. ₹99 5G Turbo Speed Mode */}
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
+                  <div>
+                    <span className="text-white font-bold block">₹99 5G Turbo Fast Speed Selling</span>
+                    <span className="text-[10px] text-slate-400">10x streaming speed boost</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={editingUser.hasPaidSpeedTurbo || false}
+                    onChange={(e) => setEditingUser({ ...editingUser, hasPaidSpeedTurbo: e.target.checked })}
+                    className="w-4 h-4 rounded text-red-600 cursor-pointer"
+                  />
+                </div>
+                {editingUser.hasPaidSpeedTurbo && (
+                  <input
+                    type="text"
+                    value={editingUser.speedTurboUtr || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, speedTurboUtr: e.target.value })}
+                    placeholder="Turbo Speed 12-digit UTR"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono"
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1805,15 +2333,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                  className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="py-2 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md"
+                  className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white text-xs font-black shadow-md cursor-pointer border border-yellow-300"
                 >
-                  Save Changes
+                  Save User Changes
                 </button>
               </div>
             </form>

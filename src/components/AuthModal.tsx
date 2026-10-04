@@ -7,7 +7,7 @@ import { ADMIN_MASTER_PASSWORD, ADMIN_MASTER_ID } from './AdminLogin';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAuthSuccess: (user: UserAccount, log: AuthLog) => void;
+  onAuthSuccess: (user: UserAccount, log: AuthLog, isNewSignup?: boolean) => void;
   onAdminAuthSuccess?: () => void;
   existingUsers: UserAccount[];
   initialMode?: 'LOGIN' | 'SIGNUP' | 'ADMIN';
@@ -145,7 +145,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         status: 'SUCCESS',
       };
 
-      onAuthSuccess(newUser, log);
+      onAuthSuccess(newUser, log, true);
       onClose();
       return;
     }
@@ -189,7 +189,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           status: 'SUCCESS',
         };
 
-        onAuthSuccess(autoUser, log);
+        onAuthSuccess(autoUser, log, true);
         onClose();
         return;
       }
@@ -217,7 +217,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         status: 'SUCCESS',
       };
 
-      onAuthSuccess(matchedUser, log);
+      onAuthSuccess(matchedUser, log, false);
       onClose();
     }
   };
@@ -265,7 +265,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Tab switch */}
-        <div className="flex border-b border-slate-200 bg-slate-50 text-xs font-bold">
+        <div className="flex border-b-2 border-amber-200 bg-amber-50/50 text-xs font-bold">
           <button
             onClick={() => {
               setMode('LOGIN');
@@ -273,8 +273,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }}
             className={`flex-1 py-3 text-center transition-all cursor-pointer min-h-[44px] ${
               mode === 'LOGIN'
-                ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'text-red-700 border-b-2 border-red-600 bg-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-red-600'
             }`}
           >
             Sign In
@@ -286,8 +286,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }}
             className={`flex-1 py-3 text-center transition-all cursor-pointer min-h-[44px] ${
               mode === 'SIGNUP'
-                ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'text-red-700 border-b-2 border-red-600 bg-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-red-600'
             }`}
           >
             Sign Up
@@ -446,16 +446,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 id="btn-auth-submit"
-                className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[44px] flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[46px] flex items-center justify-center gap-2 border border-yellow-300"
               >
                 {mode === 'LOGIN' ? (
                   <>
-                    <LogIn className="w-4 h-4" />
+                    <LogIn className="w-4 h-4 text-yellow-300" />
                     <span>Sign In to Bandwidth Node</span>
                   </>
                 ) : (
                   <>
-                    <UserPlus className="w-4 h-4" />
+                    <UserPlus className="w-4 h-4 text-yellow-300" />
                     <span>Create Free Account & Start</span>
                   </>
                 )}
@@ -470,7 +470,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
                       setErrorMessage(null);
                     }}
-                    className="text-indigo-600 hover:text-indigo-700 font-bold underline cursor-pointer"
+                    className="text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
                   >
                     {mode === 'LOGIN' ? 'Sign Up Free' : 'Sign In'}
                   </button>
