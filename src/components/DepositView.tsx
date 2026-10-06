@@ -173,6 +173,22 @@ export const DepositView: React.FC<DepositViewProps> = ({
       ) : (
         /* Main Deposit Terminal */
         <div className="space-y-4">
+          {/* Top Cancel Payment Bar ("payment karne ke uper cancel ka option add kar dijiye sir") */}
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gradient-to-r from-red-50 to-amber-50 border border-amber-300 shadow-xs">
+            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-red-600" />
+              <span>UPI Deposit Gateway</span>
+            </span>
+            <button
+              type="button"
+              onClick={onBack}
+              id="btn-cancel-deposit-top"
+              className="py-1 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 border border-yellow-300"
+            >
+              <span>Cancel Payment</span>
+            </button>
+          </div>
+
           {/* Instructions Notice Banner */}
           {userState.requireDepositBeforeWithdrawal && !userState.hasCompletedRequiredDeposit && (
             <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs flex items-start gap-2.5">

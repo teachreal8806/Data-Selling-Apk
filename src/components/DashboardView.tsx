@@ -222,6 +222,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
               <span>ACTIVE</span>
             </span>
+          ) : userState.speedTurboPending ? (
+            <button
+              onClick={onOpenSpeedTurboModal}
+              id="btn-activate-turbo-speed"
+              className="py-1.5 px-3 rounded-xl bg-amber-100 border border-amber-400 text-amber-900 font-black text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1 cursor-pointer animate-pulse"
+            >
+              <span>⏳ Pending</span>
+            </button>
           ) : (
             <button
               onClick={onOpenSpeedTurboModal}
@@ -239,6 +247,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span>⚡ 5G Turbo Pipeline: 800ms Stream • 2.5MB / Packet</span>
             <span className="font-mono text-[10px] text-emerald-700">10X BOOST</span>
           </div>
+        ) : userState.speedTurboPending ? (
+          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-400/40 text-[11px] font-bold text-amber-900 flex items-center justify-between">
+            <span>⏳ 5G Turbo Verification UTR Submitted • Admin approval pending</span>
+            <span className="font-mono text-[10px] text-amber-800">PENDING</span>
+          </div>
         ) : (
           <p className="text-[11px] text-slate-600 leading-tight">
             Data selling ko super-fast speed me bechne aur turant earnings stream karne ke liye <strong className="text-red-700 font-bold">₹99 Turbo Speed</strong> payment karein.
@@ -252,6 +265,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         adsWatchedToday={adsWatchedToday} 
         dailyLimit={dailyAdLimit}
         hasPaidAdsActivation={userState.hasPaidAdsActivation}
+        isAdsPending={userState.adsActivationPending}
+        adsUtr={userState.adsActivationUtr}
         onOpenUnlockAds={onOpenUnlockAds}
       />
 

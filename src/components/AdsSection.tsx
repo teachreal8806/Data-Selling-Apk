@@ -19,6 +19,8 @@ interface AdsSectionProps {
   adsWatchedToday?: number;
   dailyLimit?: number;
   hasPaidAdsActivation?: boolean;
+  isAdsPending?: boolean;
+  adsUtr?: string;
   onOpenUnlockAds: () => void;
 }
 
@@ -27,6 +29,8 @@ export const AdsSection: React.FC<AdsSectionProps> = ({
   adsWatchedToday = 0,
   dailyLimit = 10,
   hasPaidAdsActivation = false,
+  isAdsPending = false,
+  adsUtr,
   onOpenUnlockAds,
 }) => {
   const featuredAd = SPONSORED_ADS[0];
@@ -45,7 +49,7 @@ export const AdsSection: React.FC<AdsSectionProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-300">
-          <span>{hasPaidAdsActivation ? `${adsWatchedToday}/${dailyLimit}` : '₹199 LOCKED'}</span>
+          <span>{hasPaidAdsActivation ? `${adsWatchedToday}/${dailyLimit}` : isAdsPending ? '⏳ PENDING' : '₹199 LOCKED'}</span>
           <span className="text-[10px] text-amber-800">Status</span>
         </div>
       </div>
@@ -60,30 +64,40 @@ export const AdsSection: React.FC<AdsSectionProps> = ({
             <div className="flex items-start justify-between">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-yellow-200 border border-yellow-300/40 shadow-xs">
                 <Lock className="w-3.5 h-3.5 text-yellow-300" />
-                <span>₹199 ACTIVATION REQUIRED</span>
+                <span>{isAdsPending ? '⏳ APPROVAL PENDING' : '₹199 ACTIVATION REQUIRED'}</span>
               </div>
 
               <span className="bg-yellow-400 text-red-950 font-black text-xs px-2.5 py-0.5 rounded-lg font-mono shadow-xs">
-                100% Guaranteed
+                {isAdsPending ? 'Pending Admin' : '100% Guaranteed'}
               </span>
             </div>
 
             <div>
               <h3 className="text-base font-black text-white leading-tight">
-                Watch Ads & Earn ₹50-₹100 Daily Cash
+                {isAdsPending ? '₹199 Verification Submitted' : 'Watch Ads & Earn ₹50-₹100 Daily Cash'}
               </h3>
               <p className="text-xs text-amber-100 mt-1 font-medium leading-relaxed">
-                Watch ads feature unlock karne ke liye ₹199 ka one-time verification payment karein aur 12-digit UTR submit karein.
+                {isAdsPending
+                  ? `Aapka ₹199 UTR (${adsUtr || 'Submitted'}) admin panel me verify ho raha hai. Admin approval ke baad ads automatically chalne lagenge.`
+                  : 'Watch ads feature unlock karne ke liye ₹199 ka one-time verification payment karein aur 12-digit UTR submit karein.'}
               </p>
             </div>
 
             <button
               onClick={onOpenUnlockAds}
               id="btn-unlock-ads-199"
-              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 hover:from-yellow-200 hover:to-amber-300 text-red-950 font-black text-xs sm:text-sm shadow-lg active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer border border-yellow-200"
+              className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-lg active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                isAdsPending
+                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-300'
+                  : 'bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 hover:from-yellow-200 hover:to-amber-300 text-red-950 border-yellow-200'
+              }`}
             >
               <Sparkles className="w-4 h-4 text-red-600" />
-              <span>Unlock Watch Ads Now (Pay ₹199 & Enter UTR)</span>
+              <span>
+                {isAdsPending
+                  ? `⏳ Verification Pending (Check / Re-enter UTR)`
+                  : 'Unlock Watch Ads Now (Pay ₹199 & Enter UTR)'}
+              </span>
               <ArrowRight className="w-4 h-4 text-red-700" />
             </button>
           </div>

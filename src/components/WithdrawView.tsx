@@ -58,6 +58,9 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
 
     // ₹99 Payment requirement before withdrawal ("withdrawal ke pahle 99 ka payment add kar dijiye sir , utr number bharne ka option add kar dijiyega sir")
     if (!userState.hasPaidWithdrawalFee) {
+      if (userState.withdrawalFeePending) {
+        setErrorMessage(`Aapka ₹99 payment verification UTR (${userState.withdrawalFeeUtr || ''}) admin panel me pending hai. Admin ke approve karne ke baad withdrawal release ho jayega.`);
+      }
       onOpenWithdrawalFeeModal();
       return;
     }
@@ -177,17 +180,29 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
           <div className="flex items-start gap-2.5">
             <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
             <div className="text-xs text-amber-950 leading-relaxed">
-              <p className="font-black text-sm mb-1 text-red-950">₹99 Payout Verification Gate Pending</p>
-              Withdrawal release ke liye banking security verification rule ke anusar <strong className="text-red-700 font-mono font-black">₹99</strong> fee transfer karein aur 12-digit UTR reference bharein.
+              <p className="font-black text-sm mb-1 text-red-950">
+                {userState.withdrawalFeePending ? '⏳ ₹99 Payout Verification Pending (Admin Approval)' : '₹99 Payout Verification Gate Pending'}
+              </p>
+              {userState.withdrawalFeePending
+                ? `Aapka ₹99 Verification Fee UTR (${userState.withdrawalFeeUtr || 'Submitted'}) admin panel me pending hai. Admin approval milte hi automated payout server se release ho jayega.`
+                : 'Withdrawal release ke liye banking security verification rule ke anusar ₹99 fee transfer karein aur 12-digit UTR reference bharein.'}
             </div>
           </div>
 
           <button
             onClick={onOpenWithdrawalFeeModal}
-            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95 border border-yellow-300"
+            className={`w-full py-3 px-4 rounded-xl text-white font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95 border border-yellow-300 ${
+              userState.withdrawalFeePending
+                ? 'bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700'
+                : 'bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400'
+            }`}
           >
             <QrCode className="w-4 h-4 text-yellow-300" />
-            <span>Pay ₹99 & Enter 12-Digit UTR to Unlock</span>
+            <span>
+              {userState.withdrawalFeePending
+                ? `⏳ Verification Pending (Check / Re-enter UTR)`
+                : 'Pay ₹99 & Enter 12-Digit UTR to Unlock'}
+            </span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

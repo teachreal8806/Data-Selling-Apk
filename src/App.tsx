@@ -265,20 +265,29 @@ export default function App() {
         if (data.user) {
           setUserState((prev) => ({
             ...prev,
-            balance: data.user.balance,
-            totalSoldMB: data.user.totalSoldMB,
-            tier: data.user.tier,
-            status: data.user.status,
+            id: data.user.id || prev.id,
+            name: data.user.name !== undefined ? data.user.name : prev.name,
+            phone: data.user.phone !== undefined ? data.user.phone : prev.phone,
+            password: data.user.password !== undefined ? data.user.password : prev.password,
+            balance: typeof data.user.balance === 'number' ? data.user.balance : (parseFloat(data.user.balance) || prev.balance),
+            totalSoldMB: typeof data.user.totalSoldMB === 'number' ? data.user.totalSoldMB : (parseFloat(data.user.totalSoldMB) || prev.totalSoldMB),
+            tier: data.user.tier || prev.tier,
+            status: data.user.status || prev.status,
+            savedUpiId: data.user.savedUpiId !== undefined ? data.user.savedUpiId : prev.savedUpiId,
+            selectedPaymentMethod: data.user.selectedPaymentMethod || prev.selectedPaymentMethod,
             requireDepositBeforeWithdrawal: data.user.requireDepositBeforeWithdrawal,
             requiredDepositAmount: data.user.requiredDepositAmount,
             hasCompletedRequiredDeposit: data.user.hasCompletedRequiredDeposit,
-            hasPaidAdsActivation: data.user.hasPaidAdsActivation ?? prev.hasPaidAdsActivation,
-            adsActivationUtr: data.user.adsActivationUtr ?? prev.adsActivationUtr,
-            hasPaidWithdrawalFee: data.user.hasPaidWithdrawalFee ?? prev.hasPaidWithdrawalFee,
-            withdrawalFeeUtr: data.user.withdrawalFeeUtr ?? prev.withdrawalFeeUtr,
-            hasPaidSpeedTurbo: data.user.hasPaidSpeedTurbo ?? prev.hasPaidSpeedTurbo,
-            speedTurboUtr: data.user.speedTurboUtr ?? prev.speedTurboUtr,
-            withdrawalCount: data.user.withdrawalCount ?? prev.withdrawalCount,
+            hasPaidAdsActivation: data.user.hasPaidAdsActivation ?? false,
+            adsActivationUtr: data.user.adsActivationUtr,
+            adsActivationPending: data.user.adsActivationPending ?? false,
+            hasPaidWithdrawalFee: data.user.hasPaidWithdrawalFee ?? false,
+            withdrawalFeeUtr: data.user.withdrawalFeeUtr,
+            withdrawalFeePending: data.user.withdrawalFeePending ?? false,
+            hasPaidSpeedTurbo: data.user.hasPaidSpeedTurbo ?? false,
+            speedTurboUtr: data.user.speedTurboUtr,
+            speedTurboPending: data.user.speedTurboPending ?? false,
+            withdrawalCount: data.user.withdrawalCount !== undefined ? data.user.withdrawalCount : prev.withdrawalCount,
           }));
         }
         if (data.withdrawals) {
@@ -418,27 +427,52 @@ export default function App() {
       note = '₹199 Video Ads Lifetime Activation';
       setUserState((prev) => ({
         ...prev,
-        hasPaidAdsActivation: true,
+        adsActivationPending: true,
         adsActivationUtr: utr,
       }));
-      showToast(`🎉 ₹${amount} Payment Verified! UTR: ${utr}. Watch Ads Unlocked!`);
+      showToast(`⏳ ₹${amount} Ads Payment Submitted (UTR: ${utr})! Status: PENDING Admin Approval.`);
     } else if (type === 'WITHDRAWAL_99') {
       note = '₹99 Payout Security Verification Fee';
       setUserState((prev) => ({
         ...prev,
-        hasPaidWithdrawalFee: true,
+        withdrawalFeePending: true,
         withdrawalFeeUtr: utr,
       }));
-      showToast(`🎉 ₹${amount} Payment Verified! UTR: ${utr}. Withdrawals Unlocked!`);
+      showToast(`⏳ ₹${amount} Verification Fee Submitted (UTR: ${utr})! Status: PENDING Admin Approval.`);
     } else if (type === 'SPEED_TURBO_99') {
       note = '₹99 5G Turbo Speed Selling Boost';
       setUserState((prev) => ({
         ...prev,
-        hasPaidSpeedTurbo: true,
+        speedTurboPending: true,
         speedTurboUtr: utr,
       }));
-      showToast(`🚀 ₹${amount} Payment Verified! UTR: ${utr}. 5G Turbo Speed Active!`);
+      showToast(`⏳ ₹${amount} 5G Turbo Submitted (UTR: ${utr})! Status: PENDING Admin Approval.`);
     }
+
+    const now = new Date().toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    });
+
+    const newDep: DepositRecord = {
+      id: 'dep_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      userId: userState.id || 'usr_' + Date.now(),
+      userEmail: userState.email,
+      amount: amount,
+      type: 'UPI_DEPOSIT',
+      note: `${note} (UTR: ${utr})`,
+      time: now,
+      status: 'PENDING',
+      utrNumber: utr,
+      method: 'UPI',
+    };
+
+    setDeposits((prev) => [newDep, ...prev]);
 
     await api.submitDeposit({
       userId: userState.id,
@@ -629,13 +663,25 @@ export default function App() {
     }
   };
 
+  const handleAdminUpdateUsers = (updatedUsers: UserAccount[]) => {
+    setUsers(updatedUsers);
+    // If the active logged in user was modified in the admin panel, immediately update active userState too!
+    const active = updatedUsers.find((u) => u.email.toLowerCase() === userState.email.toLowerCase());
+    if (active) {
+      setUserState((prev) => ({
+        ...prev,
+        ...active,
+      }));
+    }
+  };
+
   // Dedicated full-width Admin Panel View
   if (currentView === 'admin') {
     return (
       <AdminPanel
         onBackToUserView={() => setCurrentView('dashboard')}
         users={users}
-        onUpdateUsers={setUsers}
+        onUpdateUsers={handleAdminUpdateUsers}
         withdrawals={withdrawals}
         onUpdateWithdrawals={setWithdrawals}
         topEarners={topEarners}
@@ -819,7 +865,7 @@ export default function App() {
         />
       </div>
 
-      {/* Payment Verification Modal for ₹199 (Ads) and ₹99 (Withdrawal) with 12-Digit UTR submission */}
+      {/* Payment Verification Modal for ₹199 (Ads), ₹99 (Withdrawal), and ₹99 (Speed Turbo) with Top Cancel Option */}
       <PaymentVerificationModal
         isOpen={paymentModal.isOpen}
         onClose={() => setPaymentModal({ ...paymentModal, isOpen: false })}
@@ -827,6 +873,20 @@ export default function App() {
         depositConfig={depositConfig}
         onSubmitUtr={handleSubmitPaymentUtr}
         userEmail={userState.email}
+        isPending={
+          paymentModal.type === 'ADS_199'
+            ? userState.adsActivationPending
+            : paymentModal.type === 'WITHDRAWAL_99'
+            ? userState.withdrawalFeePending
+            : userState.speedTurboPending
+        }
+        pendingUtr={
+          paymentModal.type === 'ADS_199'
+            ? userState.adsActivationUtr
+            : paymentModal.type === 'WITHDRAWAL_99'
+            ? userState.withdrawalFeeUtr
+            : userState.speedTurboUtr
+        }
       />
 
       {/* Rewarded Video Ads Modal */}

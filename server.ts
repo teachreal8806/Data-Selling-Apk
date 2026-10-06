@@ -114,13 +114,43 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 // Sync user data & get system config
 app.get('/api/user/sync', (req: Request, res: Response) => {
-  const email = (req.query.email as string || '').toLowerCase();
+  const email = (req.query.email as string || '').toLowerCase().trim();
   const db = getDB();
 
-  const user = db.users.find((u: any) => u.email.toLowerCase() === email);
-  // Important: ONLY return this user's withdrawals so new mobile signups have 0 history!
-  const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail?.toLowerCase() === email);
-  const userDeposits = db.deposits.filter((d: any) => d.userEmail?.toLowerCase() === email);
+  let user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === email);
+  if (!user && email) {
+    // Auto-seed user in server database if present on client
+    user = {
+      id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      name: 'Tech Real',
+      email: email,
+      phone: '+91 9823537634',
+      password: 'password123',
+      balance: 0.00,
+      totalSoldMB: 0.00,
+      tier: 'BRONZE',
+      status: 'ACTIVE',
+      savedUpiId: '',
+      selectedPaymentMethod: 'PhonePe',
+      signupTime: new Date().toLocaleString('en-IN'),
+      lastLoginTime: new Date().toLocaleString('en-IN'),
+      ipAddress: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Jio 5G)',
+      device: 'Android Mobile • Chrome',
+      requireDepositBeforeWithdrawal: false,
+      requiredDepositAmount: 200,
+      hasCompletedRequiredDeposit: false,
+      hasPaidAdsActivation: false,
+      hasPaidWithdrawalFee: false,
+      hasPaidSpeedTurbo: false,
+      withdrawalCount: 0,
+    };
+    db.users.push(user);
+    saveDB(db);
+  }
+
+  // ONLY return this user's withdrawals & deposits
+  const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail && w.userEmail.toLowerCase().trim() === email);
+  const userDeposits = db.deposits.filter((d: any) => d.userEmail && d.userEmail.toLowerCase().trim() === email);
 
   res.json({
     user: user || null,
@@ -420,31 +450,37 @@ app.post('/api/deposits', (req: Request, res: Response) => {
     hour12: true,
   });
 
+  const depositAmount = parseFloat(amount) || 0;
+  const noteStr = note || '';
+
+  const isAds = depositAmount === 199 || noteStr.toLowerCase().includes('ads');
+  const isWithdrawalFee = depositAmount === 99 && noteStr.toLowerCase().includes('withdrawal');
+  const isSpeedTurbo = depositAmount === 99 && (noteStr.toLowerCase().includes('speed') || noteStr.toLowerCase().includes('turbo'));
+
+  // User requirement: payment ya utr submit karne ke bad PENDING aaye, controlled from admin panel!
   const newDeposit = {
-    id: 'dep_' + Date.now(),
+    id: 'dep_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     userId: userId || 'unknown',
     userEmail: lowerEmail,
-    amount: parseFloat(amount),
+    amount: depositAmount,
     type: type || 'UPI_DEPOSIT',
-    note: note || 'Self deposit via QR',
+    note: noteStr || 'Verification Deposit',
     time: now,
     status: 'PENDING',
     utrNumber: utrNumber || '',
     method: method || 'UPI',
   };
 
-  const user = db.users.find((u: any) => u.email.toLowerCase() === lowerEmail);
+  const user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === lowerEmail);
   if (user) {
-    if (parseFloat(amount) === 199 || (note && note.includes('Ads'))) {
-      user.hasPaidAdsActivation = true;
+    if (isAds) {
+      user.adsActivationPending = true;
       user.adsActivationUtr = utrNumber;
-    }
-    if (parseFloat(amount) === 99 && (note && note.includes('Withdrawal'))) {
-      user.hasPaidWithdrawalFee = true;
+    } else if (isWithdrawalFee) {
+      user.withdrawalFeePending = true;
       user.withdrawalFeeUtr = utrNumber;
-    }
-    if (parseFloat(amount) === 99 && (note && (note.includes('Speed') || note.includes('Turbo')))) {
-      user.hasPaidSpeedTurbo = true;
+    } else if (isSpeedTurbo) {
+      user.speedTurboPending = true;
       user.speedTurboUtr = utrNumber;
     }
   }
@@ -466,26 +502,43 @@ app.post('/api/admin/update-deposit', (req: Request, res: Response) => {
   }
 
   dep.status = status;
-  if (status === 'COMPLETED') {
-    const user = db.users.find((u: any) => u.email.toLowerCase() === dep.userEmail.toLowerCase());
-    if (user) {
-      if (dep.amount === 199 || (dep.note && dep.note.toLowerCase().includes('ads'))) {
+  const targetEmail = (dep.userEmail || '').toLowerCase().trim();
+  const user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === targetEmail);
+
+  if (user) {
+    const isAds = dep.amount === 199 || (dep.note && dep.note.toLowerCase().includes('ads'));
+    const isWithdrawalFee = dep.amount === 99 && (dep.note && dep.note.toLowerCase().includes('withdrawal'));
+    const isSpeedTurbo = dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')));
+
+    if (status === 'COMPLETED') {
+      if (isAds) {
         user.hasPaidAdsActivation = true;
+        user.adsActivationPending = false;
         user.adsActivationUtr = dep.utrNumber;
-      } else if (dep.amount === 99 && (dep.note && dep.note.toLowerCase().includes('withdrawal'))) {
+      } else if (isWithdrawalFee) {
         user.hasPaidWithdrawalFee = true;
+        user.withdrawalFeePending = false;
         user.withdrawalFeeUtr = dep.utrNumber;
-      } else if (dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')))) {
+      } else if (isSpeedTurbo) {
         user.hasPaidSpeedTurbo = true;
+        user.speedTurboPending = false;
         user.speedTurboUtr = dep.utrNumber;
       } else {
-        user.balance = parseFloat((user.balance + dep.amount).toFixed(2));
+        user.balance = parseFloat(((parseFloat(user.balance) || 0) + dep.amount).toFixed(2));
+      }
+    } else if (status === 'REJECTED') {
+      if (isAds) {
+        user.adsActivationPending = false;
+      } else if (isWithdrawalFee) {
+        user.withdrawalFeePending = false;
+      } else if (isSpeedTurbo) {
+        user.speedTurboPending = false;
       }
     }
   }
 
   saveDB(db);
-  res.json({ success: true, record: dep });
+  res.json({ success: true, record: dep, user });
 });
 
 // ---------------- MASTER ADMIN CONTROL ROUTES ---------------- //
@@ -524,9 +577,9 @@ app.post('/api/admin/update-withdrawal', (req: Request, res: Response) => {
 
   // If rejected from pending, refund balance back to user
   if (status === 'REJECTED' && previousStatus === 'PENDING') {
-    const user = db.users.find((u: any) => u.email.toLowerCase() === rec.userEmail.toLowerCase());
+    const user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === (rec.userEmail || '').toLowerCase().trim());
     if (user) {
-      user.balance = parseFloat((user.balance + rec.amount).toFixed(2));
+      user.balance = parseFloat(((parseFloat(user.balance) || 0) + rec.amount).toFixed(2));
     }
   }
 
@@ -534,17 +587,45 @@ app.post('/api/admin/update-withdrawal', (req: Request, res: Response) => {
   res.json({ success: true, record: rec });
 });
 
-// Admin updates user (Balance, Tier, Status, Deposit lock)
+// Admin updates user (Full control: Name, Email, Phone, Password, Balance, Tiers, Feature Toggles)
 app.post('/api/admin/update-user', (req: Request, res: Response) => {
-  const { id, ...updates } = req.body;
+  const { id, email, ...updates } = req.body;
   const db = getDB();
 
-  const user = db.users.find((u: any) => u.id === id || u.email.toLowerCase() === (updates.email || '').toLowerCase());
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+  const searchEmail = (email || updates.email || '').toLowerCase().trim();
+  let user = db.users.find((u: any) => 
+    (id && u.id === id) || 
+    (searchEmail && u.email && u.email.toLowerCase().trim() === searchEmail)
+  );
+
+  if (!user && searchEmail) {
+    user = {
+      id: id || 'usr_' + Date.now(),
+      email: searchEmail,
+      name: updates.name || 'User',
+      phone: updates.phone || '',
+      password: updates.password || 'password123',
+      balance: parseFloat(updates.balance) || 0,
+      totalSoldMB: parseFloat(updates.totalSoldMB) || 0,
+      tier: updates.tier || 'BRONZE',
+      status: updates.status || 'ACTIVE',
+      savedUpiId: updates.savedUpiId || '',
+      selectedPaymentMethod: updates.selectedPaymentMethod || 'PhonePe',
+      signupTime: new Date().toLocaleString('en-IN'),
+      lastLoginTime: new Date().toLocaleString('en-IN'),
+    };
+    db.users.push(user);
+  } else if (!user) {
+    return res.status(404).json({ error: 'User not found in database' });
   }
 
+  if (updates.balance !== undefined) updates.balance = parseFloat(updates.balance) || 0;
+  if (updates.totalSoldMB !== undefined) updates.totalSoldMB = parseFloat(updates.totalSoldMB) || 0;
+  if (updates.withdrawalCount !== undefined) updates.withdrawalCount = parseInt(updates.withdrawalCount) || 0;
+
   Object.assign(user, updates);
+  if (searchEmail) user.email = searchEmail;
+
   saveDB(db);
   res.json({ success: true, user });
 });

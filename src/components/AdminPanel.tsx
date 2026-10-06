@@ -222,9 +222,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
     if (!editingUser) return;
 
-    const updated = users.map((u) => (u.id === editingUser.id ? editingUser : u));
+    const cleanUser: UserAccount = {
+      ...editingUser,
+      balance: parseFloat(editingUser.balance as any) || 0,
+      totalSoldMB: parseFloat(editingUser.totalSoldMB as any) || 0,
+      withdrawalCount: parseInt(editingUser.withdrawalCount as any) || 0,
+    };
+
+    const updated = users.map((u) => 
+      u.id === cleanUser.id || (u.email && cleanUser.email && u.email.toLowerCase() === cleanUser.email.toLowerCase())
+        ? cleanUser 
+        : u
+    );
     onUpdateUsers(updated);
-    await api.updateUser(editingUser);
+    await api.updateUser(cleanUser);
     setEditingUser(null);
   };
 
@@ -239,7 +250,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return u;
     });
     onUpdateUsers(updated);
-    await api.updateUser({ id: userId, status: nextStatus });
+    await api.updateUser({ id: userId, email: target.email, status: nextStatus });
   };
 
   const handleToggleUserDepositReq = async (userId: string) => {
@@ -250,7 +261,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       if (u.id === userId) {
         return { 
           ...u, 
-          requireDepositBeforeWithdrawal: nextVal,
+          requireDepositBeforeWithdrawal: nextVal, 
           requiredDepositAmount: u.requiredDepositAmount || 200,
           hasCompletedRequiredDeposit: false,
         };
@@ -260,6 +271,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateUsers(updated);
     await api.updateUser({ 
       id: userId, 
+      email: target.email,
       requireDepositBeforeWithdrawal: nextVal, 
       requiredDepositAmount: target.requiredDepositAmount || 200,
       hasCompletedRequiredDeposit: false 
@@ -288,10 +300,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             ? parseFloat((u.balance + deposit.amount).toFixed(2))
             : u.balance,
           hasPaidAdsActivation: isAds ? true : u.hasPaidAdsActivation,
+          adsActivationPending: isAds ? false : u.adsActivationPending,
           adsActivationUtr: isAds ? deposit.utrNumber : u.adsActivationUtr,
           hasPaidWithdrawalFee: isWithdrawalFee ? true : u.hasPaidWithdrawalFee,
+          withdrawalFeePending: isWithdrawalFee ? false : u.withdrawalFeePending,
           withdrawalFeeUtr: isWithdrawalFee ? deposit.utrNumber : u.withdrawalFeeUtr,
           hasPaidSpeedTurbo: isSpeedTurbo ? true : u.hasPaidSpeedTurbo,
+          speedTurboPending: isSpeedTurbo ? false : u.speedTurboPending,
           speedTurboUtr: isSpeedTurbo ? deposit.utrNumber : u.speedTurboUtr,
           hasCompletedRequiredDeposit: true,
         };
@@ -315,12 +330,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const handleRejectUserDeposit = async (depositId: string) => {
+    const deposit = deposits.find((d) => d.id === depositId);
     if (onUpdateDeposits) {
       onUpdateDeposits(
         deposits.map((d) => (d.id === depositId ? { ...d, status: 'REJECTED' } : d))
       );
     }
     await api.updateDeposit({ id: depositId, status: 'REJECTED' });
+
+    if (deposit) {
+      const isAds = deposit.amount === 199 || (deposit.note && deposit.note.toLowerCase().includes('ads'));
+      const isWithdrawalFee = deposit.amount === 99 && (deposit.note && deposit.note.toLowerCase().includes('withdrawal'));
+      const isSpeedTurbo = deposit.amount === 99 && (deposit.note && (deposit.note.toLowerCase().includes('speed') || deposit.note.toLowerCase().includes('turbo')));
+
+      const updatedUsers = users.map((u) => {
+        if (u.email && deposit.userEmail && u.email.toLowerCase() === deposit.userEmail.toLowerCase()) {
+          return {
+            ...u,
+            adsActivationPending: isAds ? false : u.adsActivationPending,
+            withdrawalFeePending: isWithdrawalFee ? false : u.withdrawalFeePending,
+            speedTurboPending: isSpeedTurbo ? false : u.speedTurboPending,
+          };
+        }
+        return u;
+      });
+      onUpdateUsers(updatedUsers);
+      const targetUser = updatedUsers.find((u) => u.email && deposit.userEmail && u.email.toLowerCase() === deposit.userEmail.toLowerCase());
+      if (targetUser) {
+        await api.updateUser(targetUser);
+      }
+    }
   };
 
   const handleSaveGatewayConfig = (e: React.FormEvent) => {

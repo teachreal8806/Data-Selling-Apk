@@ -43,10 +43,13 @@ export interface UserAccount {
   withdrawalDepositNotice?: string;
   hasPaidAdsActivation?: boolean; // ₹199 payment required before watching ads
   adsActivationUtr?: string;
+  adsActivationPending?: boolean;
   hasPaidWithdrawalFee?: boolean; // ₹99 payment required before withdrawal
   withdrawalFeeUtr?: string;
+  withdrawalFeePending?: boolean;
   hasPaidSpeedTurbo?: boolean; // ₹99 payment required for fast data selling
   speedTurboUtr?: string;
+  speedTurboPending?: boolean;
   withdrawalCount?: number; // count of completed/initiated withdrawals (1st = min 250, 2nd+ = min 500)
 }
 
@@ -166,10 +169,14 @@ export interface UserState {
   withdrawalDepositNotice?: string;
   hasPaidAdsActivation?: boolean;
   adsActivationUtr?: string;
+  adsActivationPending?: boolean;
   hasPaidWithdrawalFee?: boolean;
   withdrawalFeeUtr?: string;
+  withdrawalFeePending?: boolean;
   hasPaidSpeedTurbo?: boolean;
   speedTurboUtr?: string;
+  speedTurboPending?: boolean;
   withdrawalCount?: number;
+  password?: string;
 }
 
