@@ -31,7 +31,15 @@ import {
   LogOut,
   MessageSquare,
   AlertCircle,
-  Settings
+  Settings,
+  Zap,
+  TrendingUp,
+  CreditCard,
+  Tv,
+  CheckCircle,
+  HelpCircle,
+  Shield,
+  Filter
 } from 'lucide-react';
 import { 
   UserAccount, 
@@ -128,6 +136,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [searchQuery, setSearchQuery] = useState('');
+  const [userFilter, setUserFilter] = useState<'all' | 'active' | 'blocked' | 'pending' | 'ads_paid' | 'fee_paid' | 'turbo_paid'>('all');
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   // Edit User Modal State
@@ -165,7 +174,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editBroadcastNotice, setEditBroadcastNotice] = useState(systemConfig.broadcastNotice || '');
   const [settingsSavedNotice, setSettingsSavedNotice] = useState(false);
   const [isSyncingLive, setIsSyncingLive] = useState(false);
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'ads_199' | 'withdrawal_99' | 'turbo_99' | 'deposits'>('all');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'ads_199' | 'withdrawal_99' | 'turbo_99' | 'deposits'>('all');
 
   // Synchronize all data across all mobile devices
   const handleSyncLive = async () => {
@@ -239,6 +248,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingUser(null);
   };
 
+  const handleQuickAdjustBalance = async (user: UserAccount, delta: number) => {
+    const newBal = Math.max(0, parseFloat((user.balance + delta).toFixed(2)));
+    const updated = users.map((u) => (u.id === user.id ? { ...u, balance: newBal } : u));
+    onUpdateUsers(updated);
+    await api.updateUser({ id: user.id, email: user.email, balance: newBal });
+  };
+
   const handleToggleUserStatus = async (userId: string) => {
     const target = users.find((u) => u.id === userId);
     if (!target) return;
@@ -271,11 +287,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateUsers(updated);
     await api.updateUser({ 
       id: userId, 
-      email: target.email,
+      email: target.email, 
       requireDepositBeforeWithdrawal: nextVal, 
       requiredDepositAmount: target.requiredDepositAmount || 200,
       hasCompletedRequiredDeposit: false 
     });
+  };
+
+  // 1-Click Feature Toggles from User Row
+  const handleToggleUserFeature = async (
+    user: UserAccount, 
+    feature: 'ads' | 'fee' | 'turbo'
+  ) => {
+    let updatePayload: Partial<UserAccount> = {};
+    let nextUsers = users.map((u) => {
+      if (u.id === user.id) {
+        if (feature === 'ads') {
+          const nextVal = !u.hasPaidAdsActivation;
+          updatePayload = { hasPaidAdsActivation: nextVal, adsActivationPending: false };
+          return { ...u, hasPaidAdsActivation: nextVal, adsActivationPending: false };
+        }
+        if (feature === 'fee') {
+          const nextVal = !u.hasPaidWithdrawalFee;
+          updatePayload = { hasPaidWithdrawalFee: nextVal, withdrawalFeePending: false };
+          return { ...u, hasPaidWithdrawalFee: nextVal, withdrawalFeePending: false };
+        }
+        if (feature === 'turbo') {
+          const nextVal = !u.hasPaidSpeedTurbo;
+          updatePayload = { hasPaidSpeedTurbo: nextVal, speedTurboPending: false };
+          return { ...u, hasPaidSpeedTurbo: nextVal, speedTurboPending: false };
+        }
+      }
+      return u;
+    });
+
+    onUpdateUsers(nextUsers);
+    await api.updateUser({ id: user.id, email: user.email, ...updatePayload });
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -447,7 +494,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       type: depositType,
       note: depositNote,
     });
-    setDepositSuccessMsg(`Successfully deposited ₹${numAmount.toFixed(2)} to ${targetUser.email}!`);
+    setDepositSuccessMsg(`Successfully credited ₹${numAmount.toFixed(2)} to ${targetUser.email}!`);
     setTimeout(() => setDepositSuccessMsg(null), 4000);
   };
 
@@ -468,7 +515,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const handleRejectWithdrawal = async (record: WithdrawalRecord) => {
-    const reason = prompt('Enter reason for rejection (balance will be refunded):', 'Invalid UPI ID or Bank Server Timeout');
+    const reason = prompt('Enter reason for rejection (balance will be refunded to user):', 'Invalid UPI ID or Bank Server Timeout');
     if (reason === null) return;
 
     // Refund balance to user if matched
@@ -539,7 +586,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } else {
       updated = [...topEarners, editingEarner];
     }
-    // Re-sort
     updated.sort((a, b) => a.rank - b.rank);
     onUpdateTopEarners(updated);
     setEditingEarner(null);
@@ -549,318 +595,550 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateTopEarners(topEarners.filter((te) => te.id !== id));
   };
 
-  // Quick stats
+  // Computed summary stats
   const totalBalanceInCirculation = users.reduce((acc, u) => acc + u.balance, 0);
   const totalMBSoldAll = users.reduce((acc, u) => acc + u.totalSoldMB, 0);
   const pendingWithdrawalsCount = withdrawals.filter((w) => w.status === 'PENDING').length;
+  const pendingDepositsCount = deposits.filter((d) => d.status === 'PENDING').length;
+  const activeUsersCount = users.filter((u) => u.status === 'ACTIVE').length;
 
   return (
-    <div className="w-full min-h-screen bg-slate-900 text-slate-100 flex flex-col antialiased">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 bg-slate-950/90 border-b border-slate-800 px-4 py-3 flex items-center justify-between backdrop-blur-md">
+    <div className="w-full min-h-screen bg-[#07090E] text-slate-100 flex flex-col antialiased selection:bg-amber-500/30 selection:text-amber-200">
+      {/* Background Ambient Glows */}
+      <div className="fixed top-0 left-1/3 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-br from-amber-500/10 via-red-600/5 to-transparent blur-3xl pointer-events-none" />
+      <div className="fixed bottom-0 right-10 w-[500px] h-[350px] bg-red-600/5 blur-3xl pointer-events-none" />
+
+      {/* Top Luxury Navbar / Command Header */}
+      <header className="sticky top-0 z-40 bg-[#0B0E17]/95 border-b border-amber-500/20 px-4 sm:px-6 py-3 flex items-center justify-between backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToUserView}
-            className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all"
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 hover:from-amber-500/20 hover:to-red-500/20 text-slate-200 hover:text-amber-300 text-xs font-bold border border-slate-700/80 hover:border-amber-400/50 shadow-sm transition-all cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             <span>App View</span>
           </button>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
-              <span>DataSell Master Admin</span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                ROOT
-              </span>
-            </h1>
+
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 via-amber-600 to-red-600 p-[1px] shadow-md shadow-amber-500/20">
+              <div className="w-full h-full bg-[#0A0D15] rounded-xl flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-sm font-black tracking-wider text-white uppercase">
+                  DataSell Master Command
+                </h1>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  ROOT v3.2
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Central Cloud Engine • Real-time Sync Active</span>
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <a
-            href={supportConfig.telegramLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-sky-600/90 hover:bg-sky-500 text-white text-xs font-semibold shadow-xs transition-all"
-            title="Open Telegram Channel"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Official Telegram</span>
-          </a>
+          {supportConfig.telegramLink && (
+            <a
+              href={supportConfig.telegramLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-bold transition-all shadow-xs"
+              title="Open Official Telegram"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Telegram</span>
+            </a>
+          )}
 
           <button
             onClick={handleSyncLive}
             title="Sync all connected mobiles in real-time"
-            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-indigo-600/90 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-red-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-red-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold shadow-md transition-all cursor-pointer active:scale-95"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingLive ? 'animate-spin text-cyan-300' : ''}`} />
-            <span className="hidden sm:inline">Sync All Mobiles</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingLive ? 'animate-spin text-amber-200' : ''}`} />
+            <span className="hidden sm:inline">Sync Fleet</span>
           </button>
 
           <button
             onClick={handleAdminLogout}
-            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-800/60 text-xs font-semibold transition-all cursor-pointer"
-            title="Lock Admin Panel"
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-rose-950/60 text-slate-300 hover:text-rose-200 border border-slate-800 hover:border-rose-800/60 text-xs font-semibold transition-all cursor-pointer"
+            title="Lock Admin Console"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Lock Admin</span>
-          </button>
-
-          <button
-            onClick={() => window.location.reload()}
-            title="Refresh state"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
-          >
-            <RefreshCw className="w-4 h-4" />
+            <span className="hidden sm:inline">Lock</span>
           </button>
         </div>
       </header>
 
-      {/* Global Admin KPI Stats Strip */}
-      <div className="bg-slate-950 border-b border-slate-800/80 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Total Users</span>
-          <p className="text-base font-bold text-white mt-0.5">{users.length} Accounts</p>
-        </div>
+      {/* Ultra-Luxury Executive KPI Strip */}
+      <div className="relative z-10 bg-[#0A0D15]/80 border-b border-amber-500/15 px-4 sm:px-6 py-4">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {/* Card 1: Total Fleet Accounts */}
+          <div className="relative overflow-hidden p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-[#131724] to-[#0D101A] border border-amber-500/20 shadow-lg">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold tracking-wider uppercase text-amber-400/90">
+                Connected Fleet
+              </span>
+              <Users className="w-4 h-4 text-amber-400/80" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-white mt-1 tabular-nums">
+              {users.length} <span className="text-xs font-normal text-slate-400">Users</span>
+            </p>
+            <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
+              <span>{activeUsersCount} active</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-400">{users.length - activeUsersCount} blocked</span>
+            </div>
+          </div>
 
-        <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">User Balances</span>
-          <p className="text-base font-bold text-emerald-400 mt-0.5">₹{totalBalanceInCirculation.toFixed(2)}</p>
-        </div>
+          {/* Card 2: Balances in Circulation */}
+          <div className="relative overflow-hidden p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-[#131724] to-[#0D101A] border border-amber-500/20 shadow-lg">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold tracking-wider uppercase text-emerald-400/90">
+                Circulating Balance
+              </span>
+              <Wallet className="w-4 h-4 text-emerald-400/80" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-emerald-300 mt-1 font-mono tabular-nums">
+              ₹{totalBalanceInCirculation.toFixed(2)}
+            </p>
+            <div className="mt-1 text-[11px] text-slate-400 font-medium truncate">
+              Across all user app wallets
+            </div>
+          </div>
 
-        <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Pending Payouts</span>
-          <p className="text-base font-bold text-amber-400 mt-0.5">{pendingWithdrawalsCount} Requests</p>
-        </div>
+          {/* Card 3: Pending Payouts & UTRs */}
+          <div className="relative overflow-hidden p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-[#131724] to-[#0D101A] border border-amber-500/20 shadow-lg">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold tracking-wider uppercase text-amber-400/90">
+                Action Required
+              </span>
+              <CreditCard className="w-4 h-4 text-amber-400/80" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-amber-300 mt-1 tabular-nums flex items-center gap-2">
+              <span>{pendingWithdrawalsCount + pendingDepositsCount}</span>
+              {(pendingWithdrawalsCount > 0 || pendingDepositsCount > 0) && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                  NEEDS REVIEW
+                </span>
+              )}
+            </p>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <span>{pendingWithdrawalsCount} Payouts</span>
+              <span className="text-slate-600">·</span>
+              <span>{pendingDepositsCount} UTR Approvals</span>
+            </div>
+          </div>
 
-        <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Total Sold Bandwidth</span>
-          <p className="text-base font-bold text-blue-400 mt-0.5">{totalMBSoldAll.toFixed(1)} MB</p>
+          {/* Card 4: Bandwidth Sold */}
+          <div className="relative overflow-hidden p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-[#131724] to-[#0D101A] border border-amber-500/20 shadow-lg">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-red-500/60 to-transparent" />
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold tracking-wider uppercase text-rose-400/90">
+                Bandwidth Streamed
+              </span>
+              <Activity className="w-4 h-4 text-rose-400/80" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-white mt-1 font-mono tabular-nums">
+              {totalMBSoldAll >= 1000 ? `${(totalMBSoldAll / 1024).toFixed(2)} GB` : `${totalMBSoldAll.toFixed(1)} MB`}
+            </p>
+            <div className="mt-1 text-[11px] text-slate-400 font-medium">
+              Rate: ₹{systemConfig.ratePerMb.toFixed(2)} / 1 MB
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Navigation Tabs Bar */}
-      <div className="bg-slate-950 border-b border-slate-800 px-4 flex gap-1 overflow-x-auto scrollbar-none">
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'users'
-              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4 text-amber-400" />
-          <span>User Control ({users.length})</span>
-        </button>
+      {/* Modern Executive Navigation Tabs Bar */}
+      <div className="sticky top-[57px] z-30 bg-[#090C14]/90 border-b border-amber-500/20 px-4 sm:px-6 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto scrollbar-none py-2">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'users'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-amber-400" />
+            <span>Users Control</span>
+            <span className="px-1.5 py-0.2 rounded-md bg-black/40 text-[10px] font-mono text-amber-200 border border-amber-500/30">
+              {users.length}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('deposits')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'deposits'
-              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <Wallet className="w-4 h-4 text-amber-400" />
-          <span>Payment & UTR Desk</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('deposits')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'deposits'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Wallet className="w-3.5 h-3.5 text-amber-400" />
+            <span>Payment & UTR Desk</span>
+            {pendingDepositsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-md bg-amber-500/30 text-[10px] font-bold text-amber-300 border border-amber-400/50 animate-pulse">
+                {pendingDepositsCount}
+              </span>
+            )}
+          </button>
 
-        <button
-          onClick={() => setActiveTab('withdrawals')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'withdrawals'
-              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <ArrowDownToLine className="w-4 h-4 text-amber-400" />
-          <span>Withdrawals ({withdrawals.length})</span>
-          {pendingWithdrawalsCount > 0 && (
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          )}
-        </button>
+          <button
+            onClick={() => setActiveTab('withdrawals')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'withdrawals'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <ArrowDownToLine className="w-3.5 h-3.5 text-amber-400" />
+            <span>Withdrawals Desk</span>
+            {pendingWithdrawalsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-md bg-rose-500/30 text-[10px] font-bold text-rose-300 border border-rose-400/50 animate-pulse">
+                {pendingWithdrawalsCount}
+              </span>
+            )}
+          </button>
 
-        <button
-          onClick={() => setActiveTab('leaderboard')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'leaderboard'
-              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <Trophy className="w-4 h-4 text-amber-400" />
-          <span>Top 1-10 Earners Control</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('leaderboard')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'leaderboard'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <span>Top Earners Leaderboard</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'logs'
-              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <Activity className="w-4 h-4 text-amber-400" />
-          <span>Login & Signup Logs ({authLogs.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'logs'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-amber-400" />
+            <span>Audit & Login Logs</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('support')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'support'
-              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <LifeBuoy className="w-4 h-4 text-amber-400" />
-          <span>Support & Tickets Desk</span>
-          {supportTickets.filter((t) => t.status === 'NEW').length > 0 && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          )}
-        </button>
+          <button
+            onClick={() => setActiveTab('support')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'support'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <LifeBuoy className="w-3.5 h-3.5 text-amber-400" />
+            <span>Support Desk</span>
+            {supportTickets.filter((t) => t.status === 'NEW').length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/30 text-[10px] font-bold text-emerald-300 border border-emerald-400/50">
+                {supportTickets.filter((t) => t.status === 'NEW').length}
+              </span>
+            )}
+          </button>
 
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 py-3 px-3.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'settings'
-              ? 'text-yellow-300 border-amber-400 bg-amber-500/15 font-black'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <Sliders className="w-4 h-4 text-amber-400" />
-          <span>Speed & Master Controls</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'settings'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5 text-amber-400" />
+            <span>Speed & Master Config</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Content Body */}
-      <div className="flex-1 p-4 max-w-6xl w-full mx-auto space-y-4">
+      <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-5">
         {/* ==================== TAB 1: USERS CONTROL ==================== */}
         {activeTab === 'users' && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-800/60 p-3.5 rounded-2xl border border-slate-700/60">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-gradient-to-b from-[#121624] to-[#0A0D15] p-4 rounded-2xl border border-amber-500/20 shadow-lg">
+              <div className="relative flex-1 max-w-lg">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/70" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search user by name, email, phone, UPI..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
+                  placeholder="Search by name, email, phone number, or UPI ID..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#080B12] border border-slate-700/80 text-xs text-white placeholder:text-slate-500 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all font-medium"
                 />
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span>Showing {users.length} registered accounts</span>
+              {/* Quick Filter Chips */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <button
+                  onClick={() => setUserFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    userFilter === 'all'
+                      ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  All ({users.length})
+                </button>
+                <button
+                  onClick={() => setUserFilter('active')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    userFilter === 'active'
+                      ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  Active ({users.filter((u) => u.status === 'ACTIVE').length})
+                </button>
+                <button
+                  onClick={() => setUserFilter('blocked')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    userFilter === 'blocked'
+                      ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  Blocked ({users.filter((u) => u.status === 'BLOCKED').length})
+                </button>
+                <button
+                  onClick={() => setUserFilter('pending')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    userFilter === 'pending'
+                      ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-md'
+                      : 'bg-slate-900 text-amber-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  Pending UTRs ({users.filter((u) => u.adsActivationPending || u.withdrawalFeePending || u.speedTurboPending).length})
+                </button>
               </div>
             </div>
 
             {/* Users Table */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+            <div className="overflow-x-auto rounded-2xl border border-amber-500/20 bg-gradient-to-b from-[#101422] to-[#0A0D15] shadow-2xl">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900/80 text-slate-400 font-semibold">
-                    <th className="p-3">User & Contact</th>
-                    <th className="p-3">Current Balance</th>
-                    <th className="p-3">Bandwidth Sold</th>
-                    <th className="p-3">Account Tier</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Deposit Before Withdrawal</th>
-                    <th className="p-3">IP & Device</th>
-                    <th className="p-3 text-right">Actions</th>
+                  <tr className="border-b border-slate-800 bg-[#090C14] text-slate-400 font-bold tracking-wider uppercase text-[10px]">
+                    <th className="p-3.5">User Identity & Contact</th>
+                    <th className="p-3.5">Wallet Balance (₹)</th>
+                    <th className="p-3.5">Bandwidth Sold</th>
+                    <th className="p-3.5">Feature Unlocks (1-Click)</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5">Deposit Gate</th>
+                    <th className="p-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
                   {users
-                    .filter((u) =>
-                      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      u.phone.includes(searchQuery)
-                    )
+                    .filter((u) => {
+                      const matchSearch =
+                        u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        u.phone.includes(searchQuery) ||
+                        (u.savedUpiId && u.savedUpiId.toLowerCase().includes(searchQuery.toLowerCase()));
+
+                      if (!matchSearch) return false;
+                      if (userFilter === 'active') return u.status === 'ACTIVE';
+                      if (userFilter === 'blocked') return u.status === 'BLOCKED';
+                      if (userFilter === 'pending') return u.adsActivationPending || u.withdrawalFeePending || u.speedTurboPending;
+                      if (userFilter === 'ads_paid') return u.hasPaidAdsActivation;
+                      if (userFilter === 'fee_paid') return u.hasPaidWithdrawalFee;
+                      if (userFilter === 'turbo_paid') return u.hasPaidSpeedTurbo;
+                      return true;
+                    })
                     .map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-900/50 transition-colors">
-                        <td className="p-3">
-                          <div className="font-bold text-white">{user.name}</div>
-                          <div className="text-slate-400 font-mono text-[11px]">{user.email}</div>
-                          <div className="text-slate-500 text-[11px]">{user.phone}</div>
-                          <div className="text-blue-400 font-mono text-[10px] mt-0.5">{user.savedUpiId}</div>
+                      <tr key={user.id} className="hover:bg-slate-900/60 transition-colors">
+                        {/* User Identity */}
+                        <td className="p-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-red-600 p-[1px] shrink-0">
+                              <div className="w-full h-full bg-[#0D101A] rounded-xl flex items-center justify-center font-bold text-amber-300 text-xs">
+                                {user.name?.charAt(0).toUpperCase() || 'U'}
+                              </div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-white truncate">{user.name}</span>
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                                  {user.tier || 'BRONZE'}
+                                </span>
+                              </div>
+                              <div className="text-slate-400 font-mono text-[11px] truncate">{user.email}</div>
+                              <div className="text-slate-500 text-[10px]">{user.phone}</div>
+                              {user.savedUpiId && (
+                                <div className="text-amber-400/90 font-mono text-[10px] flex items-center gap-1 mt-0.5">
+                                  <span>UPI: {user.savedUpiId}</span>
+                                  <button
+                                    onClick={() => handleCopy(user.savedUpiId)}
+                                    title="Copy UPI"
+                                    className="text-slate-500 hover:text-white"
+                                  >
+                                    <Copy className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </td>
 
-                        <td className="p-3">
-                          <span className="font-extrabold text-sm text-emerald-400">
-                            ₹{user.balance.toFixed(2)}
+                        {/* Balance with Quick Adjusters */}
+                        <td className="p-3.5">
+                          <div className="space-y-1">
+                            <span className="font-extrabold text-base text-emerald-400 font-mono tabular-nums block">
+                              ₹{user.balance.toFixed(2)}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleQuickAdjustBalance(user, 100)}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20 cursor-pointer"
+                                title="Quick add ₹100"
+                              >
+                                +₹100
+                              </button>
+                              <button
+                                onClick={() => handleQuickAdjustBalance(user, 500)}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20 cursor-pointer"
+                                title="Quick add ₹500"
+                              >
+                                +₹500
+                              </button>
+                              <button
+                                onClick={() => handleQuickAdjustBalance(user, -100)}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 cursor-pointer"
+                                title="Deduct ₹100"
+                              >
+                                -₹100
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Bandwidth Sold */}
+                        <td className="p-3.5 font-mono text-slate-300 tabular-nums">
+                          <div className="font-bold">{user.totalSoldMB.toFixed(2)} MB</div>
+                          <span className="text-[10px] text-slate-500 font-sans">
+                            {user.withdrawalCount || 0} Payouts Done
                           </span>
                         </td>
 
-                        <td className="p-3 font-mono text-slate-300">
-                          {user.totalSoldMB.toFixed(2)} MB
+                        {/* 1-Click Feature Unlocks */}
+                        <td className="p-3.5">
+                          <div className="flex flex-col gap-1 text-[10px]">
+                            {/* Ads ₹199 */}
+                            <button
+                              onClick={() => handleToggleUserFeature(user, 'ads')}
+                              className={`px-2 py-0.5 rounded-md font-bold text-left flex items-center justify-between gap-2 border transition-all cursor-pointer ${
+                                user.hasPaidAdsActivation
+                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                  : user.adsActivationPending
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
+                              }`}
+                              title="Click to toggle Ads ₹199 activation"
+                            >
+                              <span>Ads ₹199:</span>
+                              <span className="font-mono">
+                                {user.hasPaidAdsActivation ? 'PAID ✓' : user.adsActivationPending ? 'PENDING' : 'LOCKED'}
+                              </span>
+                            </button>
+
+                            {/* Withdrawal Fee ₹99 */}
+                            <button
+                              onClick={() => handleToggleUserFeature(user, 'fee')}
+                              className={`px-2 py-0.5 rounded-md font-bold text-left flex items-center justify-between gap-2 border transition-all cursor-pointer ${
+                                user.hasPaidWithdrawalFee
+                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                  : user.withdrawalFeePending
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
+                              }`}
+                              title="Click to toggle Withdrawal Fee ₹99 status"
+                            >
+                              <span>Fee ₹99:</span>
+                              <span className="font-mono">
+                                {user.hasPaidWithdrawalFee ? 'PAID ✓' : user.withdrawalFeePending ? 'PENDING' : 'LOCKED'}
+                              </span>
+                            </button>
+
+                            {/* Turbo Speed ₹99 */}
+                            <button
+                              onClick={() => handleToggleUserFeature(user, 'turbo')}
+                              className={`px-2 py-0.5 rounded-md font-bold text-left flex items-center justify-between gap-2 border transition-all cursor-pointer ${
+                                user.hasPaidSpeedTurbo
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                  : user.speedTurboPending
+                                  ? 'bg-orange-500/20 text-orange-300 border-orange-500/40 animate-pulse'
+                                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
+                              }`}
+                              title="Click to toggle 5G Turbo Boost status"
+                            >
+                              <span>Turbo 5G:</span>
+                              <span className="font-mono">
+                                {user.hasPaidSpeedTurbo ? 'ACTIVE ⚡' : user.speedTurboPending ? 'PENDING' : 'OFF'}
+                              </span>
+                            </button>
+                          </div>
                         </td>
 
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
-                            {user.tier}
-                          </span>
-                        </td>
-
-                        <td className="p-3">
+                        {/* Account Status Toggle */}
+                        <td className="p-3.5">
                           <button
                             onClick={() => handleToggleUserStatus(user.id)}
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase transition-all ${
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
                               user.status === 'ACTIVE'
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
-                                : 'bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30'
+                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+                                : 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25'
                             }`}
                           >
                             {user.status || 'ACTIVE'}
                           </button>
                         </td>
 
-                        <td className="p-3">
+                        {/* Deposit Before Withdrawal Gate */}
+                        <td className="p-3.5">
                           <button
                             type="button"
                             onClick={() => handleToggleUserDepositReq(user.id)}
-                            className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all text-left flex flex-col gap-0.5 cursor-pointer ${
+                            className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all text-left flex flex-col gap-0.5 cursor-pointer border ${
                               user.requireDepositBeforeWithdrawal
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
-                                : 'bg-slate-800/90 text-slate-400 border border-slate-700/80 hover:bg-slate-700 hover:text-slate-200'
+                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25'
+                                : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
                             }`}
-                            title="Click to toggle mandatory deposit before withdrawal"
+                            title="Click to toggle mandatory deposit requirement"
                           >
-                            <div className="flex items-center gap-1 font-semibold">
-                              {user.requireDepositBeforeWithdrawal ? (
-                                <span>⚠️ Deposit Req: ₹{user.requiredDepositAmount || 200}</span>
-                              ) : (
-                                <span>✓ Direct Payout (Free)</span>
-                              )}
-                            </div>
+                            <span className="font-semibold">
+                              {user.requireDepositBeforeWithdrawal ? `₹${user.requiredDepositAmount || 200} Req` : 'Free / Direct'}
+                            </span>
                             {user.requireDepositBeforeWithdrawal && (
-                              <div className="flex items-center gap-1 text-[9px]">
-                                {user.hasCompletedRequiredDeposit ? (
-                                  <span className="bg-emerald-500/30 text-emerald-300 px-1 py-0.2 rounded font-bold">
-                                    PAID (Unlocked)
-                                  </span>
-                                ) : (
-                                  <span className="bg-rose-500/30 text-rose-300 px-1 py-0.2 rounded font-bold animate-pulse">
-                                    PENDING DEPOSIT
-                                  </span>
-                                )}
-                              </div>
+                              <span className={`text-[9px] font-bold ${user.hasCompletedRequiredDeposit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {user.hasCompletedRequiredDeposit ? 'UNLOCKED' : 'LOCKED'}
+                              </span>
                             )}
                           </button>
                         </td>
 
-                        <td className="p-3 text-[11px] text-slate-400 max-w-[180px]">
-                          <div className="truncate text-slate-300 font-mono">{user.ipAddress}</div>
-                          <div className="truncate text-slate-500">{user.device}</div>
-                          <div className="text-[10px] text-slate-600">Joined: {user.signupTime}</div>
-                        </td>
-
-                        <td className="p-3 text-right">
+                        {/* Actions */}
+                        <td className="p-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => setEditingUser(user)}
-                              title="Edit User Details & Balance"
-                              className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30 transition-all"
+                              title="Edit Full Profile & Passwords"
+                              className="p-2 rounded-xl bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -869,15 +1147,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 setDepositUserId(user.id);
                                 setActiveTab('deposits');
                               }}
-                              title="Quick Deposit to User"
-                              className="p-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 transition-all"
+                              title="Credit Money to Wallet"
+                              className="p-2 rounded-xl bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all cursor-pointer"
                             >
                               <DollarSign className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user.id)}
                               title="Delete Account"
-                              className="p-1.5 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 transition-all"
+                              className="p-2 rounded-xl bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -891,19 +1169,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
-        {/* ==================== TAB 2: DEPOSIT & SCANNER CONTROL ==================== */}
+        {/* ==================== TAB 2: PAYMENT & UTR DESK ==================== */}
         {activeTab === 'deposits' && (
-          <div className="space-y-4">
-            {/* Top: UPI Gateway & QR Scanner Settings */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div className="space-y-5">
+            {/* Top Gateway Settings Card */}
+            <div className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 sm:p-6 rounded-3xl border border-amber-500/20 shadow-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div>
-                  <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                    <QrCode className="w-4 h-4 text-emerald-400" />
+                  <h2 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
+                    <QrCode className="w-4 h-4 text-amber-400" />
                     <span>UPI ID & QR Scanner Gateway Control</span>
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Configure the exact UPI ID and Scanner QR code that users scan when depositing funds in the app.
+                    Configure the exact UPI ID and Scanner QR code that users scan when making ₹199 / ₹99 activations in the app.
                   </p>
                 </div>
                 {gatewaySavedNotice && (
@@ -916,8 +1194,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <form onSubmit={handleSaveGatewayConfig} className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Admin Official UPI ID <span className="text-emerald-400">*</span>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Admin Official UPI ID <span className="text-amber-400">*</span>
                     </label>
                     <input
                       type="text"
@@ -925,7 +1203,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       value={editUpiId}
                       onChange={(e) => setEditUpiId(e.target.value)}
                       placeholder="techreal8806@oksbi"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-emerald-500"
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-amber-300 font-mono font-bold focus:outline-hidden focus:border-amber-400"
                     />
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
                       Users will copy or scan this exact UPI ID.
@@ -933,7 +1211,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
                       Payee Business / Account Name
                     </label>
                     <input
@@ -942,7 +1220,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       value={editPayeeName}
                       onChange={(e) => setEditPayeeName(e.target.value)}
                       placeholder="DataSell Real Tech"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white focus:outline-hidden focus:border-amber-400"
                     />
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
                       Shown on user's PhonePe/GPay checkout screen.
@@ -950,7 +1228,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
                       Minimum Deposit Amount (₹)
                     </label>
                     <input
@@ -960,12 +1238,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       value={editMinDeposit}
                       onChange={(e) => setEditMinDeposit(e.target.value)}
                       placeholder="100"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-emerald-400 focus:outline-hidden focus:border-emerald-500"
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-xs font-bold text-emerald-400 font-mono focus:outline-hidden focus:border-amber-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
                       Custom QR Code Image URL (Optional)
                     </label>
                     <input
@@ -973,26 +1251,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       value={editQrImageUrl}
                       onChange={(e) => setEditQrImageUrl(e.target.value)}
                       placeholder="https://.../my_upi_qr.png"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-emerald-500"
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-amber-400"
                     />
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
-                      Leave blank to use auto-generated vector UPI QR code.
+                      Leave blank to auto-generate vector UPI QR.
                     </span>
                   </div>
 
-                  <div className="sm:col-span-2 pt-2">
+                  <div className="sm:col-span-2 pt-1">
                     <button
                       type="submit"
-                      className="py-2 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                      className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs shadow-lg transition-all cursor-pointer flex items-center gap-1.5 border border-amber-400/40 uppercase tracking-wider"
                     >
                       <Check className="w-4 h-4" />
-                      <span>Save & Apply UPI Scanner Settings</span>
+                      <span>Save & Apply UPI Scanner Gateway</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Gateway Scanner Live Preview */}
-                <div className="lg:col-span-1 bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-center">
+                <div className="lg:col-span-1 bg-[#080B12] p-4 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center">
                   <div className="p-2.5 bg-white rounded-xl shadow-md mb-2">
                     {editQrImageUrl ? (
                       <img
@@ -1015,7 +1293,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <span className="text-xs font-bold text-white truncate max-w-full">
                     {editPayeeName || 'DataSell Real'}
                   </span>
-                  <span className="text-[10px] font-mono text-emerald-400 truncate max-w-full mt-0.5">
+                  <span className="text-[10px] font-mono text-amber-400 truncate max-w-full mt-0.5 font-bold">
                     {editUpiId || 'techreal8806@oksbi'}
                   </span>
                   <span className="text-[9px] text-slate-500 mt-1">Live user scanner preview</span>
@@ -1024,20 +1302,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             {/* User Submitted Deposits & Feature Verification Desk */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-2.5 gap-2">
+            <div className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 sm:p-6 rounded-3xl border border-amber-500/20 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
                     <ShieldCheck className="w-4 h-4 text-amber-400" />
-                    <span>User Payment & Verification Gateways Desk</span>
+                    <span>Payment Verification & UTR Approvals</span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Manage all ₹199 Video Ads, ₹99 Withdrawal Fees, ₹99 Turbo Speed activations & UPI deposits.
+                    Verify UTR submissions for Ads (₹199), Withdrawal Fee (₹99), 5G Turbo Boost (₹99), or Wallet credits.
                   </p>
                 </div>
 
                 {/* Filter Tabs */}
-                <div className="flex flex-wrap items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+                <div className="flex flex-wrap items-center gap-1 bg-[#080B12] p-1 rounded-xl border border-slate-800 text-xs">
                   <button
                     type="button"
                     onClick={() => setPaymentFilter('all')}
@@ -1051,6 +1329,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </button>
                   <button
                     type="button"
+                    onClick={() => setPaymentFilter('pending')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      paymentFilter === 'pending'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-xs'
+                        : 'text-amber-400 hover:text-white'
+                    }`}
+                  >
+                    Pending ({pendingDepositsCount})
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setPaymentFilter('ads_199')}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                       paymentFilter === 'ads_199'
@@ -1058,7 +1347,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Ads ₹199 ({deposits.filter((d) => d.amount === 199 || (d.note && d.note.toLowerCase().includes('ads'))).length})
+                    Ads ₹199
                   </button>
                   <button
                     type="button"
@@ -1069,7 +1358,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Withdrawal ₹99 ({deposits.filter((d) => d.amount === 99 && (d.note && d.note.toLowerCase().includes('withdrawal'))).length})
+                    Fee ₹99
                   </button>
                   <button
                     type="button"
@@ -1080,29 +1369,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Turbo ₹99 ({deposits.filter((d) => d.amount === 99 && (d.note && (d.note.toLowerCase().includes('speed') || d.note.toLowerCase().includes('turbo')))).length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentFilter('deposits')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                      paymentFilter === 'deposits'
-                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-xs'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Deposits ({deposits.filter((d) => d.amount !== 199 && d.amount !== 99).length})
+                    Turbo ₹99
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+              {/* Deposit List Cards */}
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                 {deposits
                   .filter((dep) => {
                     const isAds = dep.amount === 199 || (dep.note && dep.note.toLowerCase().includes('ads'));
                     const isWithdrawal = dep.amount === 99 && (dep.note && dep.note.toLowerCase().includes('withdrawal'));
                     const isTurbo = dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')));
 
+                    if (paymentFilter === 'pending') return dep.status === 'PENDING';
                     if (paymentFilter === 'ads_199') return isAds;
                     if (paymentFilter === 'withdrawal_99') return isWithdrawal;
                     if (paymentFilter === 'turbo_99') return isTurbo;
@@ -1110,8 +1390,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     return true;
                   })
                   .length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 text-xs">
-                    No payment requests in this filter.
+                  <div className="text-center py-10 text-slate-500 text-xs">
+                    No payment submissions match this filter.
                   </div>
                 ) : (
                   deposits
@@ -1120,6 +1400,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       const isWithdrawal = dep.amount === 99 && (dep.note && dep.note.toLowerCase().includes('withdrawal'));
                       const isTurbo = dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')));
 
+                      if (paymentFilter === 'pending') return dep.status === 'PENDING';
                       if (paymentFilter === 'ads_199') return isAds;
                       if (paymentFilter === 'withdrawal_99') return isWithdrawal;
                       if (paymentFilter === 'turbo_99') return isTurbo;
@@ -1132,35 +1413,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       const isTurbo = dep.amount === 99 && (dep.note && (dep.note.toLowerCase().includes('speed') || dep.note.toLowerCase().includes('turbo')));
 
                       let purposeBadge = 'WALLET DEPOSIT';
-                      let badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+                      let badgeColor = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
                       if (isAds) {
-                        purposeBadge = 'ADS UNLOCK ₹199';
-                        badgeColor = 'bg-red-500/20 text-red-300 border-red-500/30';
+                        purposeBadge = 'ADS ACTIVATION ₹199';
+                        badgeColor = 'bg-red-500/20 text-red-300 border-red-500/40';
                       } else if (isWithdrawal) {
                         purposeBadge = 'WITHDRAWAL FEE ₹99';
-                        badgeColor = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+                        badgeColor = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
                       } else if (isTurbo) {
-                        purposeBadge = 'TURBO SPEED ₹99';
-                        badgeColor = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+                        purposeBadge = '5G TURBO SPEED ₹99';
+                        badgeColor = 'bg-orange-500/20 text-orange-300 border-orange-500/40';
                       }
 
                       return (
                         <div
                           key={dep.id}
-                          className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-all"
+                          className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                            dep.status === 'PENDING'
+                              ? 'bg-gradient-to-r from-amber-500/10 via-[#0E121F] to-[#0A0D15] border-amber-400/50 shadow-md'
+                              : 'bg-[#080B12] border-slate-800/80 hover:border-slate-700'
+                          }`}
                         >
-                          <div className="space-y-1.5 min-w-0">
+                          <div className="space-y-2 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-bold text-white text-xs">{dep.userEmail}</span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black border uppercase ${badgeColor}`}>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black border uppercase tracking-wider ${badgeColor}`}>
                                 {purposeBadge}
                               </span>
                               <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                                   dep.status === 'COMPLETED'
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                     : dep.status === 'PENDING'
-                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
                                     : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                                 }`}
                               >
@@ -1168,19 +1453,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </span>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-300">
                               {dep.utrNumber && (
-                                <span className="font-mono text-yellow-300 font-black bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded">
-                                  UTR: {dep.utrNumber}
-                                </span>
+                                <div className="flex items-center gap-1.5 font-mono text-amber-300 font-black bg-amber-500/15 border border-amber-500/40 px-2.5 py-0.5 rounded-lg">
+                                  <span>UTR: {dep.utrNumber}</span>
+                                  <button
+                                    onClick={() => handleCopy(dep.utrNumber!)}
+                                    title="Copy UTR Number"
+                                    className="text-amber-400 hover:text-white"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
                               )}
-                              <span className="truncate">{dep.note}</span>
+                              <span className="text-slate-400 truncate max-w-sm">{dep.note}</span>
                               <span className="text-[10px] text-slate-500 font-mono">{dep.time}</span>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                            <span className="text-base font-extrabold text-amber-400 font-mono">
+                            <span className="text-lg font-black text-amber-400 font-mono tabular-nums">
                               ₹{dep.amount.toFixed(2)}
                             </span>
 
@@ -1189,16 +1481,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleRejectUserDeposit(dep.id)}
-                                  className="py-1 px-2.5 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer"
+                                  className="py-1.5 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
                                 >
                                   Reject
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleApproveUserDeposit(dep)}
-                                  className="py-1 px-3 rounded-lg bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1 border border-yellow-300"
+                                  className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white text-xs font-black transition-all shadow-md cursor-pointer flex items-center gap-1 border border-amber-400/50 uppercase tracking-wider"
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-yellow-300" />
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
                                   <span>Approve & Unlock</span>
                                 </button>
                               </div>
@@ -1211,156 +1503,78 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            {/* Bottom Grid: Manual Balance Credit Form & Adjustment History */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Deposit Creator Form */}
-              <div className="lg:col-span-1 bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-                <div className="flex items-center gap-2 text-white font-bold text-sm">
-                  <Wallet className="w-4 h-4 text-emerald-400" />
-                  <span>Manual Balance Credit Tool</span>
+            {/* Bottom Grid: Manual Credit Tool */}
+            <div className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 sm:p-6 rounded-3xl border border-amber-500/20 shadow-xl space-y-4">
+              <div className="flex items-center gap-2 text-white font-black text-sm uppercase tracking-wider">
+                <Wallet className="w-4 h-4 text-emerald-400" />
+                <span>Direct Manual Wallet Credit Tool</span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Directly inject real rupees into any user's balance with instant server and mobile APK synchronization.
+              </p>
+
+              {depositSuccessMsg && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span className="font-bold">{depositSuccessMsg}</span>
                 </div>
-                <p className="text-xs text-slate-400">
-                  Directly adjust or top up money into any user's real balance with instant wallet crediting.
-                </p>
+              )}
 
-                {depositSuccessMsg && (
-                  <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>{depositSuccessMsg}</span>
-                  </div>
-                )}
+              <form onSubmit={handleCreateDeposit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Target User</label>
+                  <select
+                    value={depositUserId}
+                    onChange={(e) => setDepositUserId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white focus:outline-hidden focus:border-amber-400 font-medium"
+                  >
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email}) - ₹{u.balance.toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                <form onSubmit={handleCreateDeposit} className="space-y-3.5">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Select Target User
-                    </label>
-                    <select
-                      value={depositUserId}
-                      onChange={(e) => setDepositUserId(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-hidden focus:border-blue-500"
-                    >
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.email}) - Cur: ₹{u.balance.toFixed(2)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Deposit Amount (₹)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
-                        ₹
-                      </span>
-                      <input
-                        type="number"
-                        min="1"
-                        step="any"
-                        required
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(e.target.value)}
-                        placeholder="500"
-                        className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm font-bold text-white focus:outline-hidden focus:border-blue-500"
-                      />
-                    </div>
-                    {/* Preset quick buttons */}
-                    <div className="flex gap-1.5 mt-1.5">
-                      {[100, 200, 500, 1000].map((amt) => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => setDepositAmount(amt.toString())}
-                          className="flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300"
-                        >
-                          ₹{amt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Deposit Type
-                    </label>
-                    <select
-                      value={depositType}
-                      onChange={(e) => setDepositType(e.target.value as any)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-hidden focus:border-blue-500"
-                    >
-                      <option value="ADMIN_CREDIT">Administrative Credit (Manual Top-up)</option>
-                      <option value="UPI_DEPOSIT">Verified UPI Gateway Deposit</option>
-                      <option value="PROMO_BONUS">Promotional Bandwidth Bonus</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
-                      Transaction Note / Reason
-                    </label>
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Credit Amount (₹)</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
                     <input
-                      type="text"
-                      value={depositNote}
-                      onChange={(e) => setDepositNote(e.target.value)}
-                      placeholder="e.g. Bandwidth bonus / Verified deposit"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-hidden focus:border-blue-500"
+                      type="number"
+                      min="1"
+                      step="any"
+                      required
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-sm font-black text-emerald-400 font-mono"
                     />
                   </div>
+                </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Credit Type</label>
+                  <select
+                    value={depositType}
+                    onChange={(e) => setDepositType(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white focus:outline-hidden focus:border-amber-400"
+                  >
+                    <option value="ADMIN_CREDIT">Administrative Top-up</option>
+                    <option value="UPI_DEPOSIT">Verified UPI Deposit</option>
+                    <option value="PROMO_BONUS">Promotional Bonus</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
                   <button
                     type="submit"
-                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Execute Deposit Now</span>
+                    <span>Execute Credit</span>
                   </button>
-                </form>
-              </div>
-
-              {/* Deposit History Ledger */}
-              <div className="lg:col-span-2 bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-blue-400" />
-                    <span>Deposit & Balance Adjustment History</span>
-                  </h3>
-                  <span className="text-xs text-slate-400 font-mono">
-                    {deposits.length} entries
-                  </span>
                 </div>
-
-                <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-                  {deposits.map((dep) => (
-                    <div
-                      key={dep.id}
-                      className="p-3 bg-slate-900/70 border border-slate-800 rounded-xl flex items-center justify-between"
-                    >
-                      <div className="space-y-1 min-w-0 pr-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-xs">{dep.userEmail}</span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/20 text-blue-400">
-                            {dep.type}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 truncate">{dep.note}</p>
-                        <span className="text-[10px] text-slate-500 font-mono">{dep.time}</span>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <span className="text-sm font-extrabold text-emerald-400">
-                          +₹{dep.amount.toFixed(2)}
-                        </span>
-                        <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
-                          {dep.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </form>
             </div>
           </div>
         )}
@@ -1368,141 +1582,145 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* ==================== TAB 3: WITHDRAWALS CONTROL ==================== */}
         {activeTab === 'withdrawals' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/20 shadow-lg">
               <div>
-                <h2 className="text-sm font-bold text-white">Payout Requests & UPI Settlement</h2>
+                <h2 className="text-sm font-black text-white uppercase tracking-wider">
+                  Payout Requests & Settlement Desk
+                </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Approve real withdrawals, copy UPI IDs, or reject with automatic wallet balance refund.
+                  Process real user UPI payouts, copy destination UPI IDs, or reject with automatic wallet balance refund.
                 </p>
               </div>
-              <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold">
-                {pendingWithdrawalsCount} Pending
+              <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black">
+                {pendingWithdrawalsCount} PENDING
               </span>
             </div>
 
             <div className="space-y-3">
-              {withdrawals.map((record) => (
-                <div
-                  key={record.id}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3"
-                >
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">Order:</span>
-                      <span className="text-xs font-mono font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
-                        {record.orderNumber}
-                      </span>
-                      <button
-                        onClick={() => handleCopy(record.orderNumber)}
-                        className="text-slate-400 hover:text-white"
-                        title="Copy Order Number"
-                      >
-                        {copiedText === record.orderNumber ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-
-                    <span
-                      className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-md tracking-wider uppercase ${
-                        record.status === 'PENDING'
-                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
-                          : record.status === 'SUCCESSFUL'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                      }`}
-                    >
-                      {record.status}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div>
-                      <span className="text-slate-500 block">Payout Amount</span>
-                      <span className="text-base font-extrabold text-white">
-                        ₹{record.amount.toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-500 block">Payment Method</span>
-                      <span className="font-semibold text-slate-200">
-                        {record.type}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-500 block">Target UPI ID</span>
-                      <div className="flex items-center gap-1">
-                        <span className="font-mono text-slate-300 font-medium">
-                          {record.upiId}
+              {withdrawals.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs">
+                  No withdrawal requests found.
+                </div>
+              ) : (
+                withdrawals.map((record) => (
+                  <div
+                    key={record.id}
+                    className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-2xl border border-amber-500/20 shadow-lg space-y-3"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400">Order:</span>
+                        <span className="text-xs font-mono font-black text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                          {record.orderNumber}
                         </span>
                         <button
-                          onClick={() => handleCopy(record.upiId)}
+                          onClick={() => handleCopy(record.orderNumber)}
                           className="text-slate-400 hover:text-white"
-                          title="Copy UPI ID"
+                          title="Copy Order Number"
                         >
-                          {copiedText === record.upiId ? (
-                            <Check className="w-3 h-3 text-emerald-400" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
+                          <Copy className="w-3.5 h-3.5" />
                         </button>
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-black px-2.5 py-0.5 rounded-md tracking-wider uppercase ${
+                          record.status === 'PENDING'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                            : record.status === 'SUCCESSFUL'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        }`}
+                      >
+                        {record.status}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Payout Amount</span>
+                        <span className="text-lg font-black text-white font-mono tabular-nums">
+                          ₹{record.amount.toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">User Email</span>
+                        <span className="font-semibold text-slate-200 truncate block">
+                          {record.userEmail || 'User'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Destination UPI ID</span>
+                        <div className="flex items-center gap-1.5 font-mono text-amber-300 font-bold">
+                          <span>{record.upiId}</span>
+                          <button
+                            onClick={() => handleCopy(record.upiId)}
+                            className="text-amber-400 hover:text-white"
+                            title="Copy UPI ID"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Request Time</span>
+                        <span className="font-mono text-slate-400 text-[11px]">
+                          {record.time}
+                        </span>
                       </div>
                     </div>
 
-                    <div>
-                      <span className="text-slate-500 block">Timestamp</span>
-                      <span className="font-mono text-slate-400 text-[11px]">
-                        {record.time}
-                      </span>
-                    </div>
+                    {record.bankReference && (
+                      <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 font-mono">
+                        Bank RRN: {record.bankReference}
+                      </div>
+                    )}
+
+                    {record.rejectionReason && (
+                      <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300">
+                        Reason: {record.rejectionReason}
+                      </div>
+                    )}
+
+                    {/* Pending Action Buttons */}
+                    {record.status === 'PENDING' && (
+                      <div className="pt-2.5 border-t border-slate-800 flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleRejectWithdrawal(record)}
+                          className="py-1.5 px-3 rounded-xl bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/30 font-bold text-xs transition-all cursor-pointer"
+                        >
+                          Reject & Refund
+                        </button>
+
+                        <button
+                          onClick={() => handleApproveWithdrawal(record.id)}
+                          className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs transition-all shadow-md flex items-center gap-1.5 border border-amber-400/50 uppercase tracking-wider cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Approve & Settle Payout</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-
-                  {record.rejectionReason && (
-                    <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-400">
-                      Reason: {record.rejectionReason}
-                    </div>
-                  )}
-
-                  {/* Actions for Pending Requests */}
-                  {record.status === 'PENDING' && (
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleRejectWithdrawal(record)}
-                        className="py-1.5 px-3 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 font-semibold text-xs transition-all"
-                      >
-                        Reject & Refund Balance
-                      </button>
-
-                      <button
-                        onClick={() => handleApproveWithdrawal(record.id)}
-                        className="py-1.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md flex items-center gap-1.5"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Approve Payout (Mark Paid)</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
 
-        {/* ==================== TAB 4: TOP 1 TO 10 EARNERS CONTROL ==================== */}
+        {/* ==================== TAB 4: TOP 1 TO 10 EARNERS ==================== */}
         {activeTab === 'leaderboard' && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/20 shadow-lg">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <h2 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
                   <Trophy className="w-4 h-4 text-amber-400" />
-                  <span>Top 1 to 10 High Earners Manager</span>
+                  <span>Public Leaderboard (Top 10 Earners)</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Change names, cities, earnings ₹, and data sold for the public leaderboard shown to all users.
+                  Configure real or promotional top sellers shown on the public mobile leaderboard.
                 </p>
               </div>
 
@@ -1518,37 +1736,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     verified: true,
                   })
                 }
-                className="py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 shadow-md"
+                className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs transition-all flex items-center gap-1.5 shadow-md border border-amber-400/40 uppercase tracking-wider cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Earner</span>
               </button>
             </div>
 
-            {/* Earner Cards / Table */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+            <div className="overflow-x-auto rounded-2xl border border-amber-500/20 bg-gradient-to-b from-[#101422] to-[#0A0D15] shadow-2xl">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900/80 text-slate-400 font-semibold">
-                    <th className="p-3 w-16">Rank</th>
-                    <th className="p-3">User Name</th>
-                    <th className="p-3">City / State</th>
-                    <th className="p-3">Total Earned (₹)</th>
-                    <th className="p-3">Data Sold (MB)</th>
-                    <th className="p-3">Verified Badge</th>
-                    <th className="p-3 text-right">Actions</th>
+                  <tr className="border-b border-slate-800 bg-[#090C14] text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                    <th className="p-3.5 w-16">Rank</th>
+                    <th className="p-3.5">User Name</th>
+                    <th className="p-3.5">City / State</th>
+                    <th className="p-3.5">Total Earned (₹)</th>
+                    <th className="p-3.5">Data Sold (MB)</th>
+                    <th className="p-3.5">Badge</th>
+                    <th className="p-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
                   {topEarners
                     .sort((a, b) => a.rank - b.rank)
                     .map((earner) => (
-                      <tr key={earner.id} className="hover:bg-slate-900/50 transition-colors">
-                        <td className="p-3">
+                      <tr key={earner.id} className="hover:bg-slate-900/60 transition-colors">
+                        <td className="p-3.5">
                           <span
-                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
+                            className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs ${
                               earner.rank === 1
-                                ? 'bg-amber-400 text-amber-950'
+                                ? 'bg-amber-400 text-amber-950 shadow-md shadow-amber-500/30'
                                 : earner.rank === 2
                                 ? 'bg-slate-300 text-slate-900'
                                 : earner.rank === 3
@@ -1559,47 +1776,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             #{earner.rank}
                           </span>
                         </td>
-
-                        <td className="p-3 font-bold text-white">
-                          {earner.name}
-                        </td>
-
-                        <td className="p-3 text-slate-300">
-                          {earner.city}
-                        </td>
-
-                        <td className="p-3 font-mono font-extrabold text-emerald-400">
+                        <td className="p-3.5 font-bold text-white">{earner.name}</td>
+                        <td className="p-3.5 text-slate-300">{earner.city}</td>
+                        <td className="p-3.5 font-mono font-black text-emerald-400 tabular-nums">
                           ₹{earner.totalEarned.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
-
-                        <td className="p-3 font-mono text-slate-300">
+                        <td className="p-3.5 font-mono text-slate-300 tabular-nums">
                           {earner.mbSold.toLocaleString()} MB
                         </td>
-
-                        <td className="p-3">
+                        <td className="p-3.5">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               earner.verified
-                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                                 : 'bg-slate-800 text-slate-400'
                             }`}
                           >
-                            {earner.verified ? 'VERIFIED' : 'UNVERIFIED'}
+                            {earner.verified ? 'VERIFIED ✓' : 'STANDARD'}
                           </span>
                         </td>
-
-                        <td className="p-3 text-right">
+                        <td className="p-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => setEditingEarner(earner)}
-                              className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30 transition-all"
+                              className="p-1.5 rounded-lg bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer"
                               title="Edit earner"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteEarner(earner.id)}
-                              className="p-1.5 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 transition-all"
+                              className="p-1.5 rounded-lg bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer"
                               title="Delete earner"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1614,52 +1821,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
-        {/* ==================== TAB 5: LOGIN & SIGNUP ACTIVITY LOGS ==================== */}
+        {/* ==================== TAB 5: AUDIT & AUTH LOGS ==================== */}
         {activeTab === 'logs' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/20 shadow-lg">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <h2 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
                   <Activity className="w-4 h-4 text-emerald-400" />
-                  <span>Real-Time Login & Sign-up Audit Logs</span>
+                  <span>Real-Time Login & Registration Audit Trail</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Complete telemetry of every authentication event: Name, Email, Phone, Telecom IP, and Device signature.
+                  Complete telemetry of user access: Name, Email, IP Address, Device type, and Network status.
                 </p>
               </div>
 
               {onClearLogs && (
                 <button
                   onClick={onClearLogs}
-                  className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all"
+                  className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all cursor-pointer"
                 >
                   Clear Logs
                 </button>
               )}
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+            <div className="overflow-x-auto rounded-2xl border border-amber-500/20 bg-gradient-to-b from-[#101422] to-[#0A0D15] shadow-2xl">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900/80 text-slate-400 font-semibold">
-                    <th className="p-3">Time</th>
-                    <th className="p-3">Event Type</th>
-                    <th className="p-3">User & Contact</th>
-                    <th className="p-3">IP Address & Network</th>
-                    <th className="p-3">Device / Browser</th>
-                    <th className="p-3">Status</th>
+                  <tr className="border-b border-slate-800 bg-[#090C14] text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                    <th className="p-3.5">Timestamp</th>
+                    <th className="p-3.5">Event</th>
+                    <th className="p-3.5">User Identity</th>
+                    <th className="p-3.5">IP Address</th>
+                    <th className="p-3.5">Device Platform</th>
+                    <th className="p-3.5">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
                   {authLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-900/50 transition-colors">
-                      <td className="p-3 font-mono text-slate-400 text-[11px]">
+                    <tr key={log.id} className="hover:bg-slate-900/60 transition-colors">
+                      <td className="p-3.5 font-mono text-slate-400 text-[11px] tabular-nums">
                         {log.timestamp}
                       </td>
-
-                      <td className="p-3">
+                      <td className="p-3.5">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider uppercase ${
+                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
                             log.type === 'SIGNUP'
                               ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                               : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
@@ -1668,29 +1874,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           {log.type}
                         </span>
                       </td>
-
-                      <td className="p-3">
+                      <td className="p-3.5">
                         <div className="font-bold text-white">{log.userName}</div>
                         <div className="text-slate-400 font-mono text-[11px]">{log.userEmail}</div>
                         <div className="text-slate-500 text-[10px]">{log.userPhone}</div>
                       </td>
-
-                      <td className="p-3 font-mono text-slate-300">
+                      <td className="p-3.5 font-mono text-slate-300 text-[11px]">
                         <div className="flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                          <Globe className="w-3.5 h-3.5 text-blue-400" />
                           <span>{log.ipAddress}</span>
                         </div>
                       </td>
-
-                      <td className="p-3 text-slate-300">
+                      <td className="p-3.5 text-slate-300 text-[11px]">
                         <div className="flex items-center gap-1.5">
-                          <Smartphone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <Smartphone className="w-3.5 h-3.5 text-slate-400" />
                           <span>{log.device}</span>
                         </div>
                       </td>
-
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <td className="p-3.5">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                           {log.status}
                         </span>
                       </td>
@@ -1702,75 +1904,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
-        {/* ==================== TAB 6: SUPPORT & TELEGRAM CONTROL ==================== */}
+        {/* ==================== TAB 6: SUPPORT & COMMUNITY DESK ==================== */}
         {activeTab === 'support' && (
           <div className="space-y-4">
-            {/* Top Row: Telegram Channel Control & WhatsApp Support Control */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Telegram Control Card */}
-              <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              {/* Telegram Community */}
+              <div className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/20 shadow-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
                       <Send className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Telegram Channel & Group</h3>
-                      <p className="text-xs text-slate-400">Manage public community link & handle</p>
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider">Telegram Channel & Group</h3>
+                      <p className="text-xs text-slate-400">Configure public community link</p>
                     </div>
                   </div>
-                  <a
-                    href={editTelegramLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-semibold"
-                  >
-                    <span>Visit</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Official Telegram Link (URL)
-                    </label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Telegram URL</label>
                     <input
                       type="text"
                       value={editTelegramLink}
                       onChange={(e) => setEditTelegramLink(e.target.value)}
                       placeholder="https://t.me/datasell_official"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-sky-500"
+                      className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-amber-400"
                     />
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">
-                      Users clicking the Telegram button anywhere in the app will open this link.
-                    </span>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Telegram Username / Display Handle
-                    </label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Telegram Display Handle</label>
                     <input
                       type="text"
                       value={editTelegramHandle}
                       onChange={(e) => setEditTelegramHandle(e.target.value)}
                       placeholder="@datasell_official"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-sky-500"
+                      className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-amber-400"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* WhatsApp & Email Desk Card */}
-              <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              {/* WhatsApp Support Desk */}
+              <div className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/20 shadow-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                       <LifeBuoy className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Helpdesk & Contact Info</h3>
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider">Helpdesk Channels</h3>
                       <p className="text-xs text-slate-400">Direct WhatsApp and email channels</p>
                     </div>
                   </div>
@@ -1779,136 +1963,85 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        WhatsApp Support Number
-                      </label>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">WhatsApp Number</label>
                       <input
                         type="text"
                         value={editWhatsApp}
                         onChange={(e) => setEditWhatsApp(e.target.value)}
                         placeholder="+91 9823537634"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-emerald-500"
+                        className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-amber-400"
                       />
                     </div>
-
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Support Email
-                      </label>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Support Email</label>
                       <input
                         type="email"
                         value={editSupportEmail}
                         onChange={(e) => setEditSupportEmail(e.target.value)}
                         placeholder="techreal8806@gmail.com"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-emerald-500"
+                        className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white font-mono focus:outline-hidden focus:border-amber-400"
                       />
                     </div>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Support Notice / Live Announcement Banner
-                    </label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Support Notice</label>
                     <input
                       type="text"
                       value={editSupportNotice}
                       onChange={(e) => setEditSupportNotice(e.target.value)}
-                      placeholder="24/7 Priority desk for withdrawals and verification deposits."
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                      className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white focus:outline-hidden focus:border-amber-400"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Save Buttons & Feedback */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <div className="text-xs text-slate-400">
-                {supportSavedNotice ? (
-                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Support and Telegram settings updated successfully!
-                  </span>
-                ) : (
-                  <span>Click save to instantly update Telegram and Support links across the entire app.</span>
-                )}
-              </div>
-
+            <div className="flex items-center justify-between bg-gradient-to-b from-[#121624] to-[#0A0D15] p-4 rounded-2xl border border-amber-500/20">
+              <span className="text-xs text-slate-400 font-medium">
+                {supportSavedNotice ? '✓ Support and Telegram settings applied across all mobiles!' : 'Click save to update support channels.'}
+              </span>
               <button
                 type="button"
                 onClick={handleSaveSupportConfig}
-                className="py-2.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs shadow-md transition-all uppercase tracking-wider cursor-pointer"
               >
-                <Check className="w-4 h-4" />
-                <span>Save All Support & Telegram Settings</span>
+                Save Support Settings
               </button>
             </div>
 
-            {/* User Support Inquiries / Tickets Inbox */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-purple-400" />
-                    <span>Customer Support & Inquiries Inbox</span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Messages submitted by users from the Support & Help Desk view.
-                  </p>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-bold">
-                  {supportTickets.length} Tickets
-                </span>
-              </div>
-
-              <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+            {/* Tickets */}
+            <div className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/20 shadow-xl space-y-3">
+              <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
+                <MessageSquare className="w-4 h-4 text-purple-400" />
+                <span>Customer Support Inquiries ({supportTickets.length})</span>
+              </h3>
+              <div className="space-y-2.5 max-h-[360px] overflow-y-auto">
                 {supportTickets.length === 0 ? (
                   <div className="text-center py-8 text-slate-500 text-xs">
-                    No open support tickets at the moment.
+                    No open support tickets.
                   </div>
                 ) : (
                   supportTickets.map((ticket) => (
-                    <div
-                      key={ticket.id}
-                      className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-2"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-xs">{ticket.userEmail}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              ticket.status === 'RESOLVED'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
-                            }`}
-                          >
-                            {ticket.status}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-mono">{ticket.time}</span>
+                    <div key={ticket.id} className="p-3.5 bg-[#080B12] border border-slate-800 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-xs">{ticket.userEmail}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ticket.status === 'RESOLVED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300 animate-pulse'}`}>
+                          {ticket.status}
+                        </span>
                       </div>
-
-                      <div className="text-xs">
-                        <span className="font-bold text-slate-200 block">{ticket.subject}</span>
-                        <p className="text-slate-400 mt-1 whitespace-pre-wrap">{ticket.message}</p>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80">
+                      <p className="text-slate-300 text-xs">{ticket.message}</p>
+                      <div className="flex justify-end gap-2 pt-1 border-t border-slate-800">
                         {ticket.status !== 'RESOLVED' && (
                           <button
-                            type="button"
                             onClick={() => handleResolveTicket(ticket.id)}
-                            className="py-1 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1"
+                            className="py-1 px-3 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-bold"
                           >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Mark Resolved</span>
+                            Mark Resolved
                           </button>
                         )}
                         <button
-                          type="button"
                           onClick={() => handleDeleteTicket(ticket.id)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 transition-all cursor-pointer"
-                          title="Delete Ticket"
+                          className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-rose-300"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1924,21 +2057,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* ==================== TAB 7: SPEED & MASTER CONTROLS ==================== */}
         {activeTab === 'settings' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/20 shadow-lg">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-blue-400" />
-                  <span>Bandwidth Selling Speed & Master Central Controls</span>
+                <h2 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
+                  <Sliders className="w-4 h-4 text-amber-400" />
+                  <span>Bandwidth Streaming Speed & Global Central Controls</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Control bandwidth streaming speed, rates, ad rewards, and instant global broadcast alerts for all mobile devices.
+                  Set data selling speed, payout rate per MB, ad rewards, and instant global mobile broadcast announcements.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={handleSyncLive}
-                className="py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                className="py-2 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncingLive ? 'animate-spin' : ''}`} />
                 <span>Sync Mobiles</span>
@@ -1946,30 +2079,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             {settingsSavedNotice && (
-              <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                <span className="font-bold">Settings applied successfully! All connected mobiles updated in real-time.</span>
+              <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Settings applied successfully! All connected mobiles updated instantly.</span>
               </div>
             )}
 
-            <form onSubmit={handleSaveSystemSettings} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+            <form onSubmit={handleSaveSystemSettings} className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-6 rounded-3xl border border-amber-500/20 shadow-xl space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Selling Speed Controller ("data selling thoda or slow kar dijiye sir") */}
+                {/* Selling Speed */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-white flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Data Selling Speed (Streaming Interval)</span>
+                    <Activity className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Data Selling Streaming Speed</span>
                   </label>
-                  <p className="text-[11px] text-slate-400 leading-tight">
-                    Sets how gradually packets and earnings stream into user wallets.
+                  <p className="text-[11px] text-slate-400">
+                    Controls the pace at which packets stream and wallet earnings tick up.
                   </p>
                   <select
                     value={editSpeedMs}
                     onChange={(e) => setEditSpeedMs(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-semibold focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white font-bold focus:outline-hidden focus:border-amber-400"
                   >
                     <option value="6000">Very Slow (6.0 seconds per packet) - Maximum Stability</option>
-                    <option value="4500">Slow & Steady (4.5 seconds per packet) - [Recommended by User]</option>
+                    <option value="4500">Slow & Steady (4.5 seconds per packet) - [Recommended]</option>
                     <option value="3000">Moderate (3.0 seconds per packet)</option>
                     <option value="1800">Fast (1.8 seconds per packet)</option>
                   </select>
@@ -1979,182 +2112,169 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-white flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Rupee Rate per 1 MB Sold</span>
+                    <span>Rupee Rate per 1 MB Sold (₹)</span>
                   </label>
-                  <p className="text-[11px] text-slate-400 leading-tight">
+                  <p className="text-[11px] text-slate-400">
                     Payout credited per MB transferred (e.g. ₹1.00 = 500MB earns ₹500).
                   </p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      required
-                      value={editRatePerMb}
-                      onChange={(e) => setEditRatePerMb(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-emerald-400 font-bold"
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={editRatePerMb}
+                    onChange={(e) => setEditRatePerMb(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-emerald-400 font-bold font-mono"
+                  />
                 </div>
 
-                {/* Sponsored Video Ad Cash Reward */}
+                {/* Ad Reward */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-white flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <Tv className="w-3.5 h-3.5 text-amber-400" />
                     <span>Sponsored Video Ad Cash Reward (₹)</span>
                   </label>
-                  <p className="text-[11px] text-slate-400 leading-tight">
-                    Direct cash bonus credited when user watches a 10s sponsored video ad.
+                  <p className="text-[11px] text-slate-400">
+                    Direct cash bonus credited when user watches a video ad in the app.
                   </p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
-                    <input
-                      type="number"
-                      step="0.5"
-                      required
-                      value={editAdReward}
-                      onChange={(e) => setEditAdReward(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-amber-300 font-bold"
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    step="0.5"
+                    required
+                    value={editAdReward}
+                    onChange={(e) => setEditAdReward(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-amber-300 font-bold font-mono"
+                  />
                 </div>
 
-                {/* Global Mobile Broadcast Notice */}
+                {/* Broadcast Notice */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-white flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Global Mobile Broadcast Announcement</span>
+                    <MessageSquare className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Global Mobile Broadcast Announcement Banner</span>
                   </label>
-                  <p className="text-[11px] text-slate-400 leading-tight">
-                    Displays an instant alert banner on all connected mobile user dashboards.
+                  <p className="text-[11px] text-slate-400">
+                    Pushes a live headline announcement to all user dashboards.
                   </p>
                   <input
                     type="text"
                     placeholder="e.g. Instant automated ₹500 UPI withdrawals live now! Watch ads to boost earnings."
                     value={editBroadcastNotice}
                     onChange={(e) => setEditBroadcastNotice(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-xs text-white"
                   />
                 </div>
               </div>
 
-              {/* Master Status Strip */}
-              <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-slate-300 font-medium">
-                    Centralized Cloud Master Active: <strong className="text-white">{users.length} Mobiles Registered</strong>
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 font-mono">
-                  Sync Interval: 4.0s (Auto-Polling)
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-end pt-3 border-t border-slate-800">
                 <button
                   type="submit"
-                  className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+                  className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white text-xs font-black shadow-lg transition-all cursor-pointer flex items-center gap-2 border border-amber-400/40 uppercase tracking-wider"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Save & Apply Master Controls to All Mobiles</span>
+                  <span>Save & Push Master Controls</span>
                 </button>
               </div>
             </form>
           </div>
         )}
-      </div>
+      </main>
 
       {/* ==================== MODAL 1: EDIT USER MODAL ==================== */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 text-white rounded-2xl p-5 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-lg bg-gradient-to-b from-[#131726] to-[#0A0D15] border border-amber-500/30 text-white rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-blue-400" />
-                <span>Edit User: {editingUser.name}</span>
-              </h3>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-red-600 p-[1px]">
+                  <div className="w-full h-full bg-[#0D101A] rounded-xl flex items-center justify-center font-bold text-amber-300 text-xs">
+                    <Edit3 className="w-4 h-4 text-amber-400" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                    Edit User Profile: {editingUser.name}
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">{editingUser.email}</span>
+                </div>
+              </div>
               <button
                 onClick={() => setEditingUser(null)}
-                className="text-slate-400 hover:text-white"
+                className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveUser} className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={editingUser.name}
-                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
-                />
+            <form onSubmit={handleSaveUser} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingUser.name}
+                    onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={editingUser.email}
+                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white font-mono"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={editingUser.email}
-                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">Phone Number</label>
+                  <input
+                    type="text"
+                    value={editingUser.phone}
+                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">Password (View & Edit)</label>
+                  <input
+                    type="text"
+                    value={editingUser.password || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-amber-300 font-mono font-bold"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Phone Number</label>
-                <input
-                  type="text"
-                  value={editingUser.phone}
-                  onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Account Password (Admin View & Edit)</label>
-                <input
-                  type="text"
-                  value={editingUser.password || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
-                  placeholder="Enter user password"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-amber-300 font-mono"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs text-slate-400">Wallet Balance (₹)</label>
+              {/* Balance Adjuster with Quick Buttons */}
+              <div className="p-3.5 rounded-2xl bg-[#080B12] border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-300 font-bold">Wallet Balance (₹)</label>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setEditingUser({ ...editingUser, balance: Math.max(0, editingUser.balance - 100) })}
-                      className="px-1.5 py-0.5 rounded text-[10px] bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900 cursor-pointer"
+                      className="px-2 py-0.5 rounded text-[10px] bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900 cursor-pointer font-bold"
                     >
                       -₹100
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditingUser({ ...editingUser, balance: editingUser.balance + 100 })}
-                      className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer"
+                      className="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer font-bold"
                     >
                       +₹100
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditingUser({ ...editingUser, balance: editingUser.balance + 250 })}
-                      className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer"
-                    >
-                      +₹250
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setEditingUser({ ...editingUser, balance: editingUser.balance + 500 })}
-                      className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer"
+                      className="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 cursor-pointer font-bold"
                     >
                       +₹500
                     </button>
@@ -2168,13 +2288,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onChange={(e) =>
                     setEditingUser({ ...editingUser, balance: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-black text-amber-300 font-mono"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 font-black text-amber-300 font-mono text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Bandwidth Sold (MB)</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Bandwidth Sold (MB)</label>
                   <input
                     type="number"
                     step="any"
@@ -2182,16 +2302,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) =>
                       setEditingUser({ ...editingUser, totalSoldMB: parseFloat(e.target.value) || 0 })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Withdrawals Done (Count)</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Withdrawals Count</label>
                   <select
                     value={(editingUser.withdrawalCount || 0) === 0 ? '0' : '1'}
                     onChange={(e) => setEditingUser({ ...editingUser, withdrawalCount: parseInt(e.target.value, 10) })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-amber-300 font-bold"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-amber-300 font-bold"
                   >
                     <option value="0">0 (1st Payout • Min ₹250)</option>
                     <option value="1">1+ (2nd+ Payout • Min ₹500)</option>
@@ -2199,17 +2319,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              {/* Feature Activations & UTR Controls */}
-              <div className="p-3 bg-slate-950/90 rounded-xl border border-slate-800 space-y-2.5">
+              {/* Feature Activations */}
+              <div className="p-3.5 rounded-2xl bg-[#080B12] border border-slate-800 space-y-2.5">
                 <span className="text-xs font-black text-amber-400 uppercase tracking-wider block">
-                  User Payment & Feature Unlocks
+                  Feature Activations & UTRs
                 </span>
 
-                {/* 1. ₹199 Video Ads Unlock */}
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800">
+                {/* Ads Unlock */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800">
                   <div>
                     <span className="text-white font-bold block">₹199 Video Ads Monetization</span>
-                    <span className="text-[10px] text-slate-400">Allows user to watch ads and earn</span>
+                    <span className="text-[10px] text-slate-400">Allows watching ads and earning</span>
                   </div>
                   <input
                     type="checkbox"
@@ -2224,15 +2344,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     value={editingUser.adsActivationUtr || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, adsActivationUtr: e.target.value })}
                     placeholder="Ads Activation 12-digit UTR"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono"
                   />
                 )}
 
-                {/* 2. ₹99 Withdrawal Verification Fee */}
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
+                {/* Withdrawal Fee */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800">
                   <div>
                     <span className="text-white font-bold block">₹99 Withdrawal Verification Fee</span>
-                    <span className="text-[10px] text-slate-400">Unlocks bank payout request capability</span>
+                    <span className="text-[10px] text-slate-400">Unlocks bank payout capability</span>
                   </div>
                   <input
                     type="checkbox"
@@ -2247,14 +2367,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     value={editingUser.withdrawalFeeUtr || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, withdrawalFeeUtr: e.target.value })}
                     placeholder="Withdrawal Fee 12-digit UTR"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono"
                   />
                 )}
 
-                {/* 3. ₹99 5G Turbo Speed Mode */}
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
+                {/* Turbo Speed */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800">
                   <div>
-                    <span className="text-white font-bold block">₹99 5G Turbo Fast Speed Selling</span>
+                    <span className="text-white font-bold block">₹99 5G Turbo Speed Selling</span>
                     <span className="text-[10px] text-slate-400">10x streaming speed boost</span>
                   </div>
                   <input
@@ -2270,18 +2390,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     value={editingUser.speedTurboUtr || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, speedTurboUtr: e.target.value })}
                     placeholder="Turbo Speed 12-digit UTR"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono"
                   />
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Account Tier</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Account Tier</label>
                   <select
                     value={editingUser.tier}
                     onChange={(e) => setEditingUser({ ...editingUser, tier: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white"
                   >
                     <option value="BRONZE">BRONZE</option>
                     <option value="SILVER">SILVER</option>
@@ -2290,11 +2410,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Account Status</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Account Status</label>
                   <select
                     value={editingUser.status || 'ACTIVE'}
                     onChange={(e) => setEditingUser({ ...editingUser, status: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white"
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="BLOCKED">BLOCKED</option>
@@ -2303,82 +2423,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Default UPI ID</label>
+                <label className="block text-slate-400 mb-1 font-bold">Default UPI ID</label>
                 <input
                   type="text"
                   value={editingUser.savedUpiId}
                   onChange={(e) => setEditingUser({ ...editingUser, savedUpiId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono"
+                  className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white font-mono"
                 />
-              </div>
-
-              {/* Withdrawal Deposit Requirement Control */}
-              <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-white block">Require Deposit Before Withdrawal</span>
-                    <span className="text-[10px] text-slate-400">User must deposit funds first to unlock payouts</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={editingUser.requireDepositBeforeWithdrawal || false}
-                    onChange={(e) =>
-                      setEditingUser({
-                        ...editingUser,
-                        requireDepositBeforeWithdrawal: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-0 cursor-pointer"
-                  />
-                </div>
-
-                {editingUser.requireDepositBeforeWithdrawal && (
-                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
-                    <div>
-                      <label className="block text-[10px] text-slate-400 mb-0.5">Required Amount (₹)</label>
-                      <input
-                        type="number"
-                        value={editingUser.requiredDepositAmount || 200}
-                        onChange={(e) =>
-                          setEditingUser({
-                            ...editingUser,
-                            requiredDepositAmount: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-amber-300 font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-400 mb-0.5">Deposit Status</label>
-                      <select
-                        value={editingUser.hasCompletedRequiredDeposit ? 'PAID' : 'PENDING'}
-                        onChange={(e) =>
-                          setEditingUser({
-                            ...editingUser,
-                            hasCompletedRequiredDeposit: e.target.value === 'PAID',
-                          })
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-semibold"
-                      >
-                        <option value="PENDING">Pending (Locked)</option>
-                        <option value="PAID">Paid (Unlocked)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                  className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white text-xs font-black shadow-md cursor-pointer border border-yellow-300"
+                  className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black shadow-lg transition-all border border-amber-400/40 uppercase tracking-wider cursor-pointer"
                 >
                   Save User Changes
                 </button>
@@ -2390,25 +2454,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* ==================== MODAL 2: EDIT EARNER MODAL ==================== */}
       {editingEarner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 text-white rounded-2xl p-5 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md bg-gradient-to-b from-[#131726] to-[#0A0D15] border border-amber-500/30 text-white rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold flex items-center gap-2">
+              <h3 className="text-sm font-black flex items-center gap-2 uppercase tracking-wider">
                 <Trophy className="w-4 h-4 text-amber-400" />
                 <span>Configure Leaderboard Earner #{editingEarner.rank}</span>
               </h3>
               <button
                 onClick={() => setEditingEarner(null)}
-                className="text-slate-400 hover:text-white"
+                className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveEarner} className="space-y-3">
+            <form onSubmit={handleSaveEarner} className="space-y-3 text-xs">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Rank (1-10)</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Rank (1-10)</label>
                   <input
                     type="number"
                     min="1"
@@ -2418,37 +2482,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) =>
                       setEditingEarner({ ...editingEarner, rank: parseInt(e.target.value) || 1 })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-bold"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white font-bold"
                   />
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-xs text-slate-400 mb-1">Earner Full Name</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Earner Name</label>
                   <input
                     type="text"
                     required
                     value={editingEarner.name}
                     onChange={(e) => setEditingEarner({ ...editingEarner, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">City / Region</label>
+                <label className="block text-slate-400 mb-1 font-bold">City / Region</label>
                 <input
                   type="text"
                   required
                   value={editingEarner.city}
                   onChange={(e) => setEditingEarner({ ...editingEarner, city: e.target.value })}
                   placeholder="e.g. Mumbai, Delhi NCR"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Total Earned (₹)</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Total Earned (₹)</label>
                   <input
                     type="number"
                     step="any"
@@ -2460,12 +2524,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         totalEarned: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-emerald-400"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 font-bold text-emerald-400 font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Data Sold (MB)</label>
+                  <label className="block text-slate-400 mb-1 font-bold">Data Sold (MB)</label>
                   <input
                     type="number"
                     step="any"
@@ -2477,20 +2541,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         mbSold: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-blue-400"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 font-mono text-amber-300"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-1">
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer pt-1 font-semibold">
                   <input
                     type="checkbox"
                     checked={editingEarner.verified}
                     onChange={(e) =>
                       setEditingEarner({ ...editingEarner, verified: e.target.checked })
                     }
-                    className="rounded text-blue-500 focus:ring-0"
+                    className="rounded text-amber-500 focus:ring-0"
                   />
                   <span>Show Verified Network Seller Blue Badge</span>
                 </label>
@@ -2500,13 +2564,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingEarner(null)}
-                  className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                  className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="py-2 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md"
+                  className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black shadow-md cursor-pointer uppercase tracking-wider"
                 >
                   Update Earner
                 </button>
