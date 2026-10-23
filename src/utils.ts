@@ -31,3 +31,33 @@ export function calculateTier(mb: number): 'BRONZE' | 'SILVER' | 'GOLD' {
   if (mb >= 1000) return 'SILVER';
   return 'BRONZE';
 }
+
+export function getDeviceSignature(): string {
+  if (typeof navigator === 'undefined') return 'Android Mobile • APK';
+  const ua = navigator.userAgent;
+
+  // Check Android device model from userAgent
+  if (/Android/i.test(ua)) {
+    const match = ua.match(/Android\s+([\d.]+);?\s+([^;)]+)/i);
+    if (match && match[2]) {
+      const model = match[2].split('Build')[0].trim();
+      return `${model} • Android ${match[1]}`;
+    }
+    return 'Android Mobile • Chrome';
+  }
+
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    return 'Apple iOS Mobile';
+  }
+
+  if (/Windows/i.test(ua)) {
+    return 'Windows PC • Desktop';
+  }
+
+  if (/Macintosh/i.test(ua)) {
+    return 'macOS Workstation';
+  }
+
+  return 'Mobile Device • WebAPK';
+}
+

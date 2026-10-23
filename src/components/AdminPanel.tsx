@@ -66,6 +66,7 @@ interface AdminPanelProps {
   onUpdateTopEarners: (earners: TopEarner[]) => void;
   authLogs: AuthLog[];
   onClearLogs?: () => void;
+  onUpdateAuthLogs?: (logs: AuthLog[]) => void;
   deposits: DepositRecord[];
   onAddDeposit: (record: DepositRecord) => void;
   onUpdateDeposits?: (deposits: DepositRecord[]) => void;
@@ -117,6 +118,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onUpdateTopEarners,
   authLogs,
   onClearLogs,
+  onUpdateAuthLogs,
   deposits,
   onAddDeposit,
   onUpdateDeposits,
@@ -185,6 +187,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         if (data.users) onUpdateUsers(data.users);
         if (data.withdrawals) onUpdateWithdrawals(data.withdrawals);
         if (data.deposits && onUpdateDeposits) onUpdateDeposits(data.deposits);
+        if (data.authLogs && onUpdateAuthLogs) onUpdateAuthLogs(data.authLogs);
         if (data.topEarners) onUpdateTopEarners(data.topEarners);
         if (data.systemConfig && onUpdateSystemConfig) onUpdateSystemConfig(data.systemConfig);
         if (data.depositConfig && onUpdateDepositConfig) onUpdateDepositConfig(data.depositConfig);
@@ -990,6 +993,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   >
                                     <Copy className="w-2.5 h-2.5" />
                                   </button>
+                                </div>
+                              )}
+                              {/* Mobile Device & Live Status */}
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800/90 text-amber-200 text-[9px] font-mono border border-slate-700/80 max-w-[200px] truncate" title={user.device || 'Mobile APK Device'}>
+                                  📱 {user.device || 'Mobile APK'}
+                                </span>
+                                {user.ipAddress && (
+                                  <span className="font-mono text-[9px] text-slate-400 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
+                                    {user.ipAddress}
+                                  </span>
+                                )}
+                              </div>
+                              {user.lastActiveTime && (
+                                <div className="text-[9px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  <span>Active: {user.lastActiveTime}</span>
                                 </div>
                               )}
                             </div>
@@ -2206,6 +2226,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             <form onSubmit={handleSaveUser} className="space-y-4 text-xs">
+              {/* Connected Device & Real Telemetry Strip */}
+              <div className="p-3 rounded-2xl bg-[#090C15] border border-amber-500/20 grid grid-cols-2 gap-2 text-[10px]">
+                <div>
+                  <span className="text-slate-400 block font-medium">Device APK Model:</span>
+                  <span className="text-amber-300 font-bold font-mono truncate block" title={editingUser.device}>
+                    📱 {editingUser.device || 'Mobile Android/iOS'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">IP Address:</span>
+                  <span className="text-slate-200 font-mono font-bold">
+                    🌐 {editingUser.ipAddress || '103.45.12.89'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Last Active Status:</span>
+                  <span className="text-emerald-400 font-mono font-bold">
+                    {editingUser.lastActiveTime || editingUser.lastLoginTime || 'Active Now'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Registered On:</span>
+                  <span className="text-slate-300 font-mono">
+                    {editingUser.signupTime || 'Recently'}
+                  </span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1 font-bold">Full Name</label>

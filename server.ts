@@ -116,15 +116,19 @@ app.get('/api/health', (req: Request, res: Response) => {
 app.get('/api/user/sync', (req: Request, res: Response) => {
   const email = (req.query.email as string || '').toLowerCase().trim();
   const db = getDB();
+  const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
+  const ipAddress = rawIp.split(',')[0].trim();
+  const userDevice = req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser';
+  const now = new Date().toLocaleString('en-IN');
 
   let user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === email);
   if (!user && email) {
-    // Auto-seed user in server database if present on client
+    // Auto-create user record if new email connects
     user = {
       id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      name: 'Tech Real',
+      name: email.split('@')[0],
       email: email,
-      phone: '+91 9823537634',
+      phone: '',
       password: 'password123',
       balance: 0.00,
       totalSoldMB: 0.00,
@@ -132,10 +136,11 @@ app.get('/api/user/sync', (req: Request, res: Response) => {
       status: 'ACTIVE',
       savedUpiId: '',
       selectedPaymentMethod: 'PhonePe',
-      signupTime: new Date().toLocaleString('en-IN'),
-      lastLoginTime: new Date().toLocaleString('en-IN'),
-      ipAddress: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Jio 5G)',
-      device: 'Android Mobile • Chrome',
+      signupTime: now,
+      lastLoginTime: now,
+      lastActiveTime: now,
+      ipAddress: ipAddress,
+      device: userDevice,
       requireDepositBeforeWithdrawal: false,
       requiredDepositAmount: 200,
       hasCompletedRequiredDeposit: false,
@@ -146,6 +151,8 @@ app.get('/api/user/sync', (req: Request, res: Response) => {
     };
     db.users.push(user);
     saveDB(db);
+  } else if (user) {
+    user.lastActiveTime = now;
   }
 
   // ONLY return this user's withdrawals & deposits
@@ -172,8 +179,8 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
 
   const db = getDB();
   const lowerEmail = email.toLowerCase().trim();
+  const cleanPhone = (phone || '').trim();
 
-  let existingUser = db.users.find((u: any) => u.email.toLowerCase() === lowerEmail);
   const now = new Date().toLocaleString('en-IN', {
     day: '2-digit',
     month: '2-digit',
@@ -184,12 +191,19 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
     hour12: true,
   });
 
-  const ipAddress = ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
+  const rawIp = ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
+  const ipAddress = rawIp.split(',')[0].trim();
   const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
 
+  let existingUser = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === lowerEmail);
+
   if (existingUser) {
-    // Already registered, update login info
+    // If user already existed, update credentials with real info entered during signup
+    if (name) existingUser.name = name.trim();
+    if (cleanPhone) existingUser.phone = cleanPhone;
+    if (password) existingUser.password = password.trim();
     existingUser.lastLoginTime = now;
+    existingUser.lastActiveTime = now;
     existingUser.ipAddress = ipAddress;
     existingUser.device = userDevice;
 
@@ -199,7 +213,7 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
       userEmail: existingUser.email,
       userName: existingUser.name,
       userPhone: existingUser.phone,
-      type: 'LOGIN',
+      type: 'SIGNUP',
       timestamp: now,
       ipAddress: ipAddress,
       device: userDevice,
@@ -208,22 +222,25 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
     db.authLogs.unshift(authLog);
     saveDB(db);
 
-    const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail?.toLowerCase() === lowerEmail);
+    const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail && w.userEmail.toLowerCase().trim() === lowerEmail);
+    const userDeposits = db.deposits.filter((d: any) => d.userEmail && d.userEmail.toLowerCase().trim() === lowerEmail);
     return res.json({
       success: true,
       isNew: false,
       user: existingUser,
       withdrawals: userWithdrawals,
+      deposits: userDeposits,
+      authLog,
     });
   }
 
   // BRAND NEW USER on this mobile: clean slate with 0 history
   const newUser = {
     id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-    name: name || 'User ' + Math.floor(1000 + Math.random() * 9000),
+    name: name?.trim() || lowerEmail.split('@')[0],
     email: lowerEmail,
-    phone: phone || '+91 9' + Math.floor(100000000 + Math.random() * 900000000),
-    password: password,
+    phone: cleanPhone || '+91 9' + Math.floor(100000000 + Math.random() * 900000000),
+    password: password.trim(),
     balance: 0.00, // Starts at 0
     totalSoldMB: 0.00, // Starts at 0
     tier: 'BRONZE',
@@ -232,11 +249,16 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
     selectedPaymentMethod: 'PhonePe',
     signupTime: now,
     lastLoginTime: now,
+    lastActiveTime: now,
     ipAddress: ipAddress,
     device: userDevice,
     requireDepositBeforeWithdrawal: false,
     requiredDepositAmount: 200,
     hasCompletedRequiredDeposit: false,
+    hasPaidAdsActivation: false,
+    hasPaidWithdrawalFee: false,
+    hasPaidSpeedTurbo: false,
+    withdrawalCount: 0,
   };
 
   db.users.unshift(newUser);
@@ -263,8 +285,9 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
     success: true,
     isNew: true,
     user: newUser,
-    withdrawals: [], // Fresh empty history
+    withdrawals: [],
     deposits: [],
+    authLog,
   });
 });
 
@@ -272,9 +295,14 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
 app.post('/api/auth/login', (req: Request, res: Response) => {
   const { email, password, device, ip } = req.body;
   const db = getDB();
-  const lowerEmail = (email || '').toLowerCase().trim();
+  const cleanInput = (email || '').toLowerCase().trim();
 
-  const user = db.users.find((u: any) => u.email.toLowerCase() === lowerEmail);
+  // Find user by email or by phone number
+  const user = db.users.find((u: any) => 
+    (u.email && u.email.toLowerCase().trim() === cleanInput) ||
+    (u.phone && cleanInput.length >= 7 && u.phone.replace(/\D/g, '') === cleanInput.replace(/\D/g, ''))
+  );
+
   const now = new Date().toLocaleString('en-IN', {
     day: '2-digit',
     month: '2-digit',
@@ -285,14 +313,16 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     hour12: true,
   });
 
-  const ipAddress = ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
-  const userDevice = device || 'Mobile Device';
+  const rawIp = ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
+  const ipAddress = rawIp.split(',')[0].trim();
+  const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
 
   if (!user || (user.password && user.password !== password)) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
   user.lastLoginTime = now;
+  user.lastActiveTime = now;
   user.ipAddress = ipAddress;
   user.device = userDevice;
 
@@ -311,11 +341,14 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   db.authLogs.unshift(authLog);
   saveDB(db);
 
-  const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail?.toLowerCase() === lowerEmail);
+  const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail && w.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim());
+  const userDeposits = db.deposits.filter((d: any) => d.userEmail && d.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim());
   res.json({
     success: true,
     user,
     withdrawals: userWithdrawals,
+    deposits: userDeposits,
+    authLog,
   });
 });
 
@@ -327,15 +360,22 @@ app.post('/api/packets/stream', (req: Request, res: Response) => {
   }
 
   const db = getDB();
-  const user = db.users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+  const user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
   if (user) {
-    user.balance = parseFloat((user.balance + amount).toFixed(2));
-    user.totalSoldMB = parseFloat((user.totalSoldMB + mb).toFixed(2));
+    // If user is BLOCKED by Admin, stop packet earnings!
+    if (user.status === 'BLOCKED') {
+      return res.status(403).json({ error: 'Account suspended by Admin', blocked: true });
+    }
+
+    user.balance = parseFloat(((parseFloat(user.balance) || 0) + amount).toFixed(2));
+    user.totalSoldMB = parseFloat(((parseFloat(user.totalSoldMB) || 0) + mb).toFixed(2));
+    user.lastActiveTime = new Date().toLocaleString('en-IN');
     saveDB(db);
     return res.json({ success: true, balance: user.balance, totalSoldMB: user.totalSoldMB });
   }
   res.status(404).json({ error: 'User not found' });
 });
+
 
 // Reward for watching sponsored video ad
 app.post('/api/ads/reward', (req: Request, res: Response) => {

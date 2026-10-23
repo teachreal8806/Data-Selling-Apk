@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, Phone, LogIn, UserPlus, Shield, Eye, EyeOff, CheckCircle2, AlertCircle, Wifi } from 'lucide-react';
+import { X, Lock, Mail, User, Phone, LogIn, UserPlus, Shield, Eye, EyeOff, CheckCircle2, AlertCircle, Wifi, Loader2 } from 'lucide-react';
 import { UserAccount, AuthLog } from '../types';
-import { formatDateTime } from '../utils';
+import { formatDateTime, getDeviceSignature } from '../utils';
 import { ADMIN_MASTER_PASSWORD, ADMIN_MASTER_ID } from './AdminLogin';
+import { api } from '../api';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sync mode if initialMode changes
   React.useEffect(() => {
@@ -105,120 +107,58 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // SIGNUP
     if (mode === 'SIGNUP') {
-      const userExists = existingUsers.some(
-        (u) => u.email.toLowerCase() === cleanInput || (phone && u.phone === phone.trim())
-      );
-
-      if (userExists) {
-        setErrorMessage('An account with this email already exists. Please log in.');
-        return;
-      }
-
-      const newUser: UserAccount = {
-        id: 'usr_' + Date.now().toString(),
+      setIsSubmitting(true);
+      const deviceSignature = getDeviceSignature();
+      api.signup({
         email: cleanInput,
+        password,
         name: name.trim() || cleanInput.split('@')[0],
         phone: phone.trim() || '+91 98000 00000',
-        password,
-        status: 'ACTIVE',
-        balance: 0,
-        totalSoldMB: 0,
-        tier: 'BRONZE',
-        savedUpiId: '',
-        selectedPaymentMethod: 'PhonePe',
-        signupTime: formatDateTime(new Date()),
-        lastLoginTime: formatDateTime(new Date()),
-        ipAddress: '103.' + Math.floor(Math.random() * 200) + '.' + Math.floor(Math.random() * 255) + '.1',
-        device: navigator.userAgent.includes('Mobile') ? 'Mobile Android/iOS' : 'Desktop Node',
-      };
-
-      const log: AuthLog = {
-        id: 'log_' + Date.now().toString(),
-        userId: newUser.id,
-        userEmail: cleanInput,
-        userName: newUser.name,
-        userPhone: newUser.phone,
-        type: 'SIGNUP',
-        timestamp: formatDateTime(new Date()),
-        device: newUser.device,
-        ipAddress: newUser.ipAddress,
-        status: 'SUCCESS',
-      };
-
-      onAuthSuccess(newUser, log, true);
-      onClose();
+        device: deviceSignature,
+      }).then((res) => {
+        setIsSubmitting(false);
+        if (res.error) {
+          setErrorMessage(res.error);
+          return;
+        }
+        if (res.user) {
+          onAuthSuccess(res.user, res.log, true);
+          onClose();
+        }
+      }).catch((err) => {
+        setIsSubmitting(false);
+        setErrorMessage('Unable to register mobile account. Check network connection.');
+      });
       return;
     }
 
     // LOGIN
     if (mode === 'LOGIN') {
-      const matchedUser = existingUsers.find(
-        (u) => u.email.toLowerCase() === cleanInput || u.phone === cleanInput
-      );
-
-      if (!matchedUser) {
-        // Create an automatic demo active user if first time
-        const autoUser: UserAccount = {
-          id: 'usr_' + Date.now().toString(),
-          email: cleanInput.includes('@') ? cleanInput : `${cleanInput}@datasell.in`,
-          name: cleanInput.split('@')[0],
-          phone: '+91 98000 00000',
-          password,
-          status: 'ACTIVE',
-          balance: 0,
-          totalSoldMB: 0,
-          tier: 'BRONZE',
-          savedUpiId: '',
-          selectedPaymentMethod: 'PhonePe',
-          signupTime: formatDateTime(new Date()),
-          lastLoginTime: formatDateTime(new Date()),
-          ipAddress: '103.45.12.89',
-          device: 'Bandwidth Node Client',
-        };
-
-        const log: AuthLog = {
-          id: 'log_' + Date.now().toString(),
-          userId: autoUser.id,
-          userEmail: autoUser.email,
-          userName: autoUser.name,
-          userPhone: autoUser.phone,
-          type: 'LOGIN',
-          timestamp: formatDateTime(new Date()),
-          device: autoUser.device,
-          ipAddress: autoUser.ipAddress,
-          status: 'SUCCESS',
-        };
-
-        onAuthSuccess(autoUser, log, true);
-        onClose();
-        return;
-      }
-
-      if (matchedUser.status === 'BLOCKED') {
-        setErrorMessage('Your account has been temporarily restricted by admin. Contact support.');
-        return;
-      }
-
-      if (matchedUser.password && matchedUser.password !== password) {
-        setErrorMessage('Incorrect password. Please try again.');
-        return;
-      }
-
-      const log: AuthLog = {
-        id: 'log_' + Date.now().toString(),
-        userId: matchedUser.id,
-        userEmail: matchedUser.email,
-        userName: matchedUser.name,
-        userPhone: matchedUser.phone,
-        type: 'LOGIN',
-        timestamp: formatDateTime(new Date()),
-        device: 'Bandwidth Node Client',
-        ipAddress: '103.45.12.89',
-        status: 'SUCCESS',
-      };
-
-      onAuthSuccess(matchedUser, log, false);
-      onClose();
+      setIsSubmitting(true);
+      const deviceSignature = getDeviceSignature();
+      api.login({
+        email: cleanInput,
+        password,
+        device: deviceSignature,
+      }).then((res) => {
+        setIsSubmitting(false);
+        if (res.error) {
+          setErrorMessage(res.error);
+          return;
+        }
+        if (res.user) {
+          if (res.user.status === 'BLOCKED') {
+            setErrorMessage('Your account has been restricted by administrator. Contact Support.');
+            return;
+          }
+          onAuthSuccess(res.user, res.log, false);
+          onClose();
+        }
+      }).catch((err) => {
+        setIsSubmitting(false);
+        setErrorMessage('Unable to login. Check network connection.');
+      });
+      return;
     }
   };
 
@@ -446,9 +386,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 id="btn-auth-submit"
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[46px] flex items-center justify-center gap-2 border border-yellow-300"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[46px] flex items-center justify-center gap-2 border border-yellow-300 disabled:opacity-75 disabled:cursor-not-allowed"
               >
-                {mode === 'LOGIN' ? (
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
+                    <span>Connecting Central Cloud...</span>
+                  </>
+                ) : mode === 'LOGIN' ? (
                   <>
                     <LogIn className="w-4 h-4 text-yellow-300" />
                     <span>Sign In to Bandwidth Node</span>

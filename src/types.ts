@@ -51,6 +51,7 @@ export interface UserAccount {
   speedTurboUtr?: string;
   speedTurboPending?: boolean;
   withdrawalCount?: number; // count of completed/initiated withdrawals (1st = min 250, 2nd+ = min 500)
+  lastActiveTime?: string; // Real-time timestamp of mobile activity / packet streaming
 }
 
 export interface AuthLog {
@@ -178,5 +179,6 @@ export interface UserState {
   speedTurboPending?: boolean;
   withdrawalCount?: number;
   password?: string;
+  lastActiveTime?: string;
 }
 

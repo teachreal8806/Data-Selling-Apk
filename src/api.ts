@@ -38,13 +38,15 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      const json = await res.json();
       if (res.ok) {
-        return await res.json();
+        return json;
       }
+      return { error: json.error || 'Registration failed' };
     } catch (e) {
       console.warn('API signup offline', e);
+      return { error: 'Network error connecting to central server' };
     }
-    return null;
   },
 
   // Auth: Login on any mobile
@@ -55,13 +57,15 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      const json = await res.json();
       if (res.ok) {
-        return await res.json();
+        return json;
       }
+      return { error: json.error || 'Invalid email or password' };
     } catch (e) {
       console.warn('API login offline', e);
+      return { error: 'Network error connecting to central server' };
     }
-    return null;
   },
 
   // Stream bandwidth sell packet

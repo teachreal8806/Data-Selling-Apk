@@ -43,7 +43,7 @@ import {
 } from './initialData';
 import { formatTimeAmPm, formatDateTime, generateOrderNumber, calculateTier } from './utils';
 import { api } from './api';
-import { Bell, CheckCircle2 } from 'lucide-react';
+import { Bell, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   sellingSpeedMs: 4500, // Slow, steady bandwidth streaming ("data selling thoda or slow kar dijiye sir")
@@ -381,7 +381,18 @@ export default function App() {
     };
   }, [userState.isSelling, systemConfig.sellingSpeedMs, systemConfig.ratePerMb, userState.email]);
 
+  // Immediately halt bandwidth transmission if admin restricts this mobile
+  useEffect(() => {
+    if (userState.status === 'BLOCKED' && userState.isSelling) {
+      setUserState((prev) => ({ ...prev, isSelling: false }));
+    }
+  }, [userState.status, userState.isSelling]);
+
   const handleToggleSelling = () => {
+    if (userState.status === 'BLOCKED') {
+      showToast('⚠️ Mobile account restricted by Admin. Bandwidth sharing disabled.');
+      return;
+    }
     setUserState((prev) => ({
       ...prev,
       isSelling: !prev.isSelling,
@@ -688,6 +699,7 @@ export default function App() {
         onUpdateTopEarners={setTopEarners}
         authLogs={authLogs}
         onClearLogs={() => setAuthLogs([])}
+        onUpdateAuthLogs={setAuthLogs}
         deposits={deposits}
         onAddDeposit={handleAddDeposit}
         onUpdateDeposits={setDeposits}
@@ -749,6 +761,22 @@ export default function App() {
           <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white px-4 py-2 text-xs font-black flex items-center gap-2 shadow-xs">
             <Bell className="w-3.5 h-3.5 shrink-0 animate-bounce text-yellow-300" />
             <span className="truncate">{systemConfig.broadcastNotice}</span>
+          </div>
+        )}
+
+        {/* Suspended Mobile Account Notice */}
+        {userState.status === 'BLOCKED' && (
+          <div className="bg-gradient-to-r from-rose-700 to-red-600 text-white px-3.5 py-2 text-xs font-bold flex items-center justify-between border-b border-rose-500 shadow-md">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-yellow-300 animate-pulse" />
+              <span className="truncate text-[11px]">Account suspended by Admin. Bandwidth sharing disabled.</span>
+            </div>
+            <button
+              onClick={() => setCurrentView('support')}
+              className="px-2 py-0.5 rounded bg-yellow-400 text-slate-900 font-extrabold text-[10px] shrink-0 hover:bg-yellow-300 cursor-pointer"
+            >
+              Support
+            </button>
           </div>
         )}
 
