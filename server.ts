@@ -60,23 +60,100 @@ const DEFAULT_DB = {
   users: [
     {
       id: 'usr_admin_default',
-      name: 'Tech Real',
+      name: 'Deepak Kumar',
       email: 'techreal8806@gmail.com',
-      phone: '+91 9823537634',
-      password: 'password123',
-      balance: 0.00,
-      totalSoldMB: 0.00,
-      tier: 'BRONZE',
+      phone: '7543355356',
+      password: '1234',
+      balance: 450.00,
+      totalSoldMB: 450.00,
+      tier: 'SILVER',
       status: 'ACTIVE',
       savedUpiId: 'techreal8806@oksbi',
       selectedPaymentMethod: 'PhonePe',
       signupTime: '04/09/2026, 09:15:00 am',
-      lastLoginTime: '04/10/2026, 09:30:00 am',
-      ipAddress: '103.21.244.18 (Jio 5G)',
-      device: 'Android 14 • Chrome Mobile',
+      lastLoginTime: '23/10/2026, 01:54:06 pm',
+      ipAddress: '2401:4900:d16b:1719:998e:6fea:921f:50c7',
+      device: 'Android Mobile • Chrome',
+      requireDepositBeforeWithdrawal: false,
+      requiredDepositAmount: 200,
+      hasCompletedRequiredDeposit: true,
+      hasPaidAdsActivation: true,
+      hasPaidWithdrawalFee: true,
+      hasPaidSpeedTurbo: false,
+      withdrawalCount: 1,
+    },
+    {
+      id: 'usr_1792761316511_hnyn',
+      name: 'Tech Real',
+      email: 'sk@gmail.com',
+      phone: '+91 9823537634',
+      password: 'password123',
+      balance: 280.50,
+      totalSoldMB: 280.50,
+      tier: 'BRONZE',
+      status: 'ACTIVE',
+      savedUpiId: 'techreal8806@oksbi',
+      selectedPaymentMethod: 'PhonePe',
+      signupTime: '23/10/2026, 1:15:16 pm',
+      lastLoginTime: '23/10/2026, 1:15:16 pm',
+      ipAddress: '2401:4900:d16b:1719:998e:6fea:921f:50c7',
+      device: 'Android Mobile • Chrome',
+      requireDepositBeforeWithdrawal: false,
+      requiredDepositAmount: 200,
+      hasCompletedRequiredDeposit: false,
+      hasPaidAdsActivation: false,
+      hasPaidWithdrawalFee: false,
+      hasPaidSpeedTurbo: false,
+      withdrawalCount: 0,
+    },
+    {
+      id: 'usr_1',
+      name: 'Mansi Sharma',
+      email: 'mansisss1430@gmail.com',
+      phone: '+91 9876543210',
+      password: 'password123',
+      balance: 194.09,
+      totalSoldMB: 441.99,
+      tier: 'BRONZE',
+      status: 'ACTIVE',
+      savedUpiId: 'mansisss1430@oksbi',
+      selectedPaymentMethod: 'PhonePe',
+      signupTime: '13/08/2025, 02:00:00 pm',
+      lastLoginTime: '15/08/2025, 06:15:00 pm',
+      ipAddress: '49.36.120.45 (Airtel 5G)',
+      device: 'Vivo V29 • Chrome Mobile',
+    },
+    {
+      id: 'usr_2',
+      name: 'Suresh Raina',
+      email: 'suresh.raina@gmail.com',
+      phone: '+91 9811223344',
+      password: 'password123',
+      balance: 1250.00,
+      totalSoldMB: 1850.20,
+      tier: 'SILVER',
+      status: 'ACTIVE',
+      savedUpiId: 'suresh@paytm',
+      selectedPaymentMethod: 'GPay',
+      signupTime: '10/08/2025, 11:30:00 am',
+      lastLoginTime: '15/08/2025, 04:20:00 pm',
+      ipAddress: '157.34.89.12 (Vi India)',
+      device: 'Samsung Galaxy S23 • OneUI',
     }
   ],
-  withdrawals: [],
+  withdrawals: [
+    {
+      id: 'wd_prev_101',
+      userId: 'usr_admin_default',
+      userEmail: 'techreal8806@gmail.com',
+      orderNumber: 'ORD-75892',
+      amount: 250,
+      type: 'PhonePe',
+      upiId: 'techreal8806@oksbi',
+      time: '22/10/2026, 05:30:10 pm',
+      status: 'SUCCESSFUL'
+    }
+  ],
   deposits: [],
   authLogs: [],
   topEarners: [
@@ -134,36 +211,7 @@ app.get('/api/user/sync', (req: Request, res: Response) => {
   const now = new Date().toLocaleString('en-IN');
 
   let user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === email);
-  if (!user && email) {
-    // Auto-create user record if new email connects
-    user = {
-      id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      name: email.split('@')[0],
-      email: email,
-      phone: '',
-      password: 'password123',
-      balance: 0.00,
-      totalSoldMB: 0.00,
-      tier: 'BRONZE',
-      status: 'ACTIVE',
-      savedUpiId: '',
-      selectedPaymentMethod: 'PhonePe',
-      signupTime: now,
-      lastLoginTime: now,
-      lastActiveTime: now,
-      ipAddress: ipAddress,
-      device: userDevice,
-      requireDepositBeforeWithdrawal: false,
-      requiredDepositAmount: 200,
-      hasCompletedRequiredDeposit: false,
-      hasPaidAdsActivation: false,
-      hasPaidWithdrawalFee: false,
-      hasPaidSpeedTurbo: false,
-      withdrawalCount: 0,
-    };
-    db.users.push(user);
-    saveDB(db);
-  } else if (user) {
+  if (user) {
     user.lastActiveTime = now;
   }
 
@@ -308,12 +356,37 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   const { email, password, device, ip } = req.body;
   const db = getDB();
   const cleanInput = (email || '').toLowerCase().trim();
+  const cleanPass = (password !== undefined && password !== null) ? String(password).trim() : '';
 
   // Find user by email or by phone number
-  const user = db.users.find((u: any) => 
-    (u.email && u.email.toLowerCase().trim() === cleanInput) ||
-    (u.phone && cleanInput.length >= 7 && u.phone.replace(/\D/g, '') === cleanInput.replace(/\D/g, ''))
-  );
+  const inputDigits = cleanInput.replace(/\D/g, '');
+  const user = db.users.find((u: any) => {
+    if (!u) return false;
+    const uEmail = (u.email || '').toLowerCase().trim();
+    if (uEmail && uEmail === cleanInput) return true;
+    if (cleanInput.length >= 7 && u.phone) {
+      const uDigits = String(u.phone).replace(/\D/g, '');
+      if (uDigits && inputDigits && (uDigits.endsWith(inputDigits) || inputDigits.endsWith(uDigits))) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  if (!user) {
+    return res.status(404).json({ 
+      error: 'Account not found! Please check your email/phone or Sign Up first.',
+      code: 'USER_NOT_FOUND' 
+    });
+  }
+
+  const userPass = (user.password !== undefined && user.password !== null) ? String(user.password).trim() : '';
+  if (userPass && userPass !== cleanPass) {
+    return res.status(401).json({ 
+      error: 'Incorrect password! Please enter the correct password.',
+      code: 'INVALID_PASSWORD' 
+    });
+  }
 
   const now = new Date().toLocaleString('en-IN', {
     day: '2-digit',
@@ -328,10 +401,6 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   const rawIp = ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
   const ipAddress = rawIp.split(',')[0].trim();
   const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
-
-  if (!user || (user.password && user.password !== password)) {
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
 
   user.lastLoginTime = now;
   user.lastActiveTime = now;

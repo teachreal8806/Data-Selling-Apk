@@ -59,11 +59,10 @@ export const api = {
       console.warn('API signup network error, initializing local fallback:', e);
     }
 
-    // Seamless fallback: If mobile network/central server has a temporary hitch,
-    // generate the account locally and immediately start background sync so the user is never blocked!
-    const cleanEmail = data.email.toLowerCase().trim();
+    // Local registration fallback for offline mode
+    const cleanEmail = (data.email || '').toLowerCase().trim();
     const fallbackUser: UserAccount = {
-      id: 'usr_' + Date.now().toString(),
+      id: 'usr_' + Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
       email: cleanEmail,
       name: data.name?.trim() || cleanEmail.split('@')[0],
       phone: data.phone?.trim() || '+91 98000 00000',
@@ -78,7 +77,7 @@ export const api = {
       lastLoginTime: new Date().toLocaleString('en-IN'),
       lastActiveTime: new Date().toLocaleString('en-IN'),
       ipAddress: '103.21.244.18 (Mobile)',
-      device: data.device || 'Mobile APK Device',
+      device: data.device || 'Mobile Device',
     };
 
     const fallbackLog: AuthLog = {
@@ -90,20 +89,24 @@ export const api = {
       type: 'SIGNUP',
       timestamp: new Date().toLocaleString('en-IN'),
       ipAddress: fallbackUser.ipAddress || '103.21.244.18',
-      device: fallbackUser.device || 'Mobile APK',
+      device: fallbackUser.device || 'Mobile App',
       status: 'SUCCESS',
     };
 
     return { success: true, isNew: true, user: fallbackUser, log: fallbackLog };
   },
 
-  // Auth: Login on any mobile with automatic offline fallback
+  // Auth: Login - Strictly verifies credentials against registered accounts
+  // NEVER creates a new account on login!
   async login(data: { email: string; password?: string; device?: string }) {
+    const cleanInput = (data.email || '').toLowerCase().trim();
+    const cleanPass = (data.password !== undefined && data.password !== null) ? String(data.password).trim() : '';
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, email: cleanInput, password: cleanPass }),
       });
 
       let json: any = null;
@@ -113,54 +116,75 @@ export const api = {
         console.warn('Non-JSON response in login', parseErr);
       }
 
-      if (res.ok && json) {
+      if (res.ok && json && json.success) {
         return {
           ...json,
           log: json.authLog || json.log,
         };
       }
       if (json && json.error) {
-        return { error: json.error };
+        return { error: json.error, code: json.code };
+      }
+      if (!res.ok) {
+        return { error: 'Invalid email/phone or password. Please try again.' };
       }
     } catch (e) {
-      console.warn('API login network error, initializing local fallback:', e);
+      console.warn('API login network error:', e);
     }
 
-    // Seamless fallback: Allow login locally if network error occurs
-    const cleanEmail = data.email.toLowerCase().trim();
-    const fallbackUser: UserAccount = {
-      id: 'usr_' + Date.now().toString(),
-      email: cleanEmail,
-      name: cleanEmail.split('@')[0],
-      phone: '+91 98000 00000',
-      password: data.password || '1234',
-      status: 'ACTIVE',
-      balance: 0,
-      totalSoldMB: 0,
-      tier: 'BRONZE',
-      savedUpiId: '',
-      selectedPaymentMethod: 'PhonePe',
-      signupTime: new Date().toLocaleString('en-IN'),
-      lastLoginTime: new Date().toLocaleString('en-IN'),
-      lastActiveTime: new Date().toLocaleString('en-IN'),
-      ipAddress: '103.21.244.18 (Mobile)',
-      device: data.device || 'Mobile APK Device',
-    };
+    // Local cached users check: ONLY authenticate if user already exists
+    try {
+      const cachedUsersStr = localStorage.getItem('datasell_users_list');
+      if (cachedUsersStr) {
+        const cachedUsers: UserAccount[] = JSON.parse(cachedUsersStr);
+        const inputDigits = cleanInput.replace(/\D/g, '');
+        const matched = cachedUsers.find((u) => {
+          if (!u) return false;
+          const uEmail = (u.email || '').toLowerCase().trim();
+          if (uEmail && uEmail === cleanInput) return true;
+          if (cleanInput.length >= 7 && u.phone) {
+            const uDigits = String(u.phone).replace(/\D/g, '');
+            if (uDigits && inputDigits && (uDigits.endsWith(inputDigits) || inputDigits.endsWith(uDigits))) {
+              return true;
+            }
+          }
+          return false;
+        });
 
-    const fallbackLog: AuthLog = {
-      id: 'log_' + Date.now().toString(),
-      userId: fallbackUser.id,
-      userEmail: fallbackUser.email,
-      userName: fallbackUser.name,
-      userPhone: fallbackUser.phone,
-      type: 'LOGIN',
-      timestamp: new Date().toLocaleString('en-IN'),
-      ipAddress: fallbackUser.ipAddress || '103.21.244.18',
-      device: fallbackUser.device || 'Mobile APK',
-      status: 'SUCCESS',
-    };
+        if (matched) {
+          const matchedPass = String(matched.password || '').trim();
+          if (cleanPass && matchedPass && matchedPass !== cleanPass) {
+            return { error: 'Incorrect password! Please enter the correct password.' };
+          }
+          // Restore the authentic cached account with real balance
+          return {
+            success: true,
+            user: matched,
+            isOffline: true,
+            log: {
+              id: 'log_' + Date.now().toString(),
+              userId: matched.id,
+              userEmail: matched.email,
+              userName: matched.name,
+              userPhone: matched.phone,
+              type: 'LOGIN' as const,
+              timestamp: new Date().toLocaleString('en-IN'),
+              ipAddress: '127.0.0.1 (Local)',
+              device: data.device || 'Mobile App',
+              status: 'SUCCESS' as const,
+            }
+          };
+        }
+      }
+    } catch (localErr) {
+      console.error('Error checking local user cache', localErr);
+    }
 
-    return { success: true, user: fallbackUser, log: fallbackLog };
+    // No auto-creation during login! Return error so user knows to sign up
+    return { 
+      error: 'Account not found! Please check your credentials or Sign Up first.',
+      code: 'USER_NOT_FOUND' 
+    };
   },
 
   // Stream bandwidth sell packet

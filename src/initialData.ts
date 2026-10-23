@@ -15,21 +15,28 @@ export const INITIAL_TOP_EARNERS: TopEarner[] = [
 
 export const INITIAL_USERS: UserAccount[] = [
   {
-    id: 'usr_main',
-    name: 'Tech Real',
+    id: 'usr_admin_default',
+    name: 'Deepak Kumar',
     email: 'techreal8806@gmail.com',
-    phone: '+91 9823537634',
-    password: 'password123',
-    balance: 0.00,
-    totalSoldMB: 0.00,
-    tier: 'BRONZE',
+    phone: '7543355356',
+    password: '1234',
+    balance: 450.00,
+    totalSoldMB: 450.00,
+    tier: 'SILVER',
     status: 'ACTIVE',
     savedUpiId: 'techreal8806@oksbi',
     selectedPaymentMethod: 'PhonePe',
     signupTime: '04/09/2026, 09:15:00 am',
-    lastLoginTime: '04/09/2026, 10:05:00 am',
-    ipAddress: '103.21.244.18 (Jio 5G)',
-    device: 'Android 14 • Chrome Mobile',
+    lastLoginTime: '23/10/2026, 01:54:06 pm',
+    ipAddress: '2401:4900:d16b:1719:998e:6fea:921f:50c7',
+    device: 'Android Mobile • Chrome',
+    requireDepositBeforeWithdrawal: false,
+    requiredDepositAmount: 200,
+    hasCompletedRequiredDeposit: true,
+    hasPaidAdsActivation: true,
+    hasPaidWithdrawalFee: true,
+    hasPaidSpeedTurbo: false,
+    withdrawalCount: 1,
   },
   {
     id: 'usr_1',
@@ -149,4 +156,16 @@ export const INITIAL_AUTH_LOGS: AuthLog[] = [
 
 export const INITIAL_DEPOSITS: DepositRecord[] = [];
 
-export const INITIAL_WITHDRAWALS: WithdrawalRecord[] = [];
+export const INITIAL_WITHDRAWALS: WithdrawalRecord[] = [
+  {
+    id: 'wd_prev_101',
+    userId: 'usr_admin_default',
+    userEmail: 'techreal8806@gmail.com',
+    orderNumber: 'ORD-75892',
+    amount: 250,
+    type: 'PhonePe',
+    upiId: 'techreal8806@oksbi',
+    time: '22/10/2026, 05:30:10 pm',
+    status: 'SUCCESSFUL',
+  }
+];

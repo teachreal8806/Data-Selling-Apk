@@ -8,7 +8,13 @@ import { api } from '../api';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAuthSuccess: (user: UserAccount, log: AuthLog, isNewSignup?: boolean) => void;
+  onAuthSuccess: (
+    user: UserAccount, 
+    log: AuthLog, 
+    isNewSignup?: boolean,
+    serverWithdrawals?: any[],
+    serverDeposits?: any[]
+  ) => void;
   onAdminAuthSuccess?: () => void;
   existingUsers: UserAccount[];
   initialMode?: 'LOGIN' | 'SIGNUP' | 'ADMIN';
@@ -56,7 +62,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const cleanAdminId = adminId.trim().toLowerCase();
       const cleanAdminPass = adminPassword.trim();
 
-      const validAdminIds = ['admin', 'deepakadmin', 'deepak_admin', 'master_admin', 'techreal8806@gmail.com'];
+      const validAdminIds = ['admin', 'deepakadmin', 'deepak_admin', 'master_admin'];
       const isValidAdminId = validAdminIds.includes(cleanAdminId) || cleanAdminId.length > 0;
 
       if (!isValidAdminId) {
@@ -79,19 +85,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     const cleanInput = email.trim().toLowerCase();
 
-    // Check if user is logging in with Admin credentials directly in standard Login tab
-    const validAdminIds = ['admin', 'deepakadmin', 'deepak_admin', 'master_admin', 'techreal8806@gmail.com'];
-    if (mode === 'LOGIN' && (validAdminIds.includes(cleanInput) || password.trim() === ADMIN_MASTER_PASSWORD)) {
-      if (password.trim() === ADMIN_MASTER_PASSWORD) {
-        sessionStorage.setItem('datasell_admin_session', 'true');
-        if (onAdminAuthSuccess) {
-          onAdminAuthSuccess();
+    // In standard user login tab, only route to admin if explicit admin username is entered
+    if (mode === 'LOGIN') {
+      const explicitAdminUsernames = ['admin', 'deepakadmin', 'master_admin'];
+      if (explicitAdminUsernames.includes(cleanInput)) {
+        if (password.trim() === ADMIN_MASTER_PASSWORD) {
+          sessionStorage.setItem('datasell_admin_session', 'true');
+          if (onAdminAuthSuccess) {
+            onAdminAuthSuccess();
+          }
+          onClose();
+          return;
+        } else {
+          setErrorMessage('Invalid Master Admin Password.');
+          return;
         }
-        onClose();
-        return;
-      } else if (validAdminIds.includes(cleanInput)) {
-        setErrorMessage('Invalid Master Password.');
-        return;
       }
     }
 
@@ -123,7 +131,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
         if (res && res.user) {
-          onAuthSuccess(res.user, (res as any).log || (res as any).authLog, true);
+          onAuthSuccess(
+            res.user, 
+            (res as any).log || (res as any).authLog, 
+            res.isNew !== false,
+            (res as any).withdrawals,
+            (res as any).deposits
+          );
           onClose();
         }
       } catch (err) {
@@ -133,7 +147,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // LOGIN
+    // LOGIN - Strictly validates existing accounts
     if (mode === 'LOGIN') {
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
@@ -153,7 +167,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             setErrorMessage('Your account has been restricted by administrator. Contact Support.');
             return;
           }
-          onAuthSuccess(res.user, (res as any).log || (res as any).authLog, false);
+          onAuthSuccess(
+            res.user, 
+            (res as any).log || (res as any).authLog, 
+            false,
+            (res as any).withdrawals,
+            (res as any).deposits
+          );
           onClose();
         }
       } catch (err) {

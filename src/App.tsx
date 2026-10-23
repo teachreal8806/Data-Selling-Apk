@@ -72,19 +72,20 @@ const DEFAULT_DEPOSIT_GATEWAY: DepositGatewayConfig = {
 };
 
 const DEFAULT_USER_STATE: UserState = {
+  id: 'usr_admin_default',
   email: 'techreal8806@gmail.com',
-  name: 'Tech Real',
-  phone: '+91 9823537634',
-  balance: 0.00,
-  totalSoldMB: 0.00,
+  name: 'Deepak Kumar',
+  phone: '7543355356',
+  balance: 450.00,
+  totalSoldMB: 450.00,
   isSelling: false,
-  tier: 'BRONZE',
+  tier: 'SILVER',
   savedUpiId: 'techreal8806@oksbi',
   selectedPaymentMethod: 'PhonePe',
-  hasPaidAdsActivation: false,
-  hasPaidWithdrawalFee: false,
+  hasPaidAdsActivation: true,
+  hasPaidWithdrawalFee: true,
   hasPaidSpeedTurbo: false,
-  withdrawalCount: 0,
+  withdrawalCount: 1,
 };
 
 export default function App() {
@@ -565,34 +566,62 @@ export default function App() {
     setUserState((prev) => ({ ...prev, ...updated }));
   };
 
-  const handleAuthSuccess = async (account: UserAccount, authLog: AuthLog, isNewSignup: boolean = false) => {
+  const handleAuthSuccess = (
+    account: UserAccount, 
+    authLog: AuthLog, 
+    isNewSignup: boolean = false,
+    serverWithdrawals?: WithdrawalRecord[],
+    serverDeposits?: DepositRecord[]
+  ) => {
     if (isNewSignup) {
       setPackets([]);
       setWithdrawals((prev) => prev.filter((w) => w.userEmail?.toLowerCase() === account.email.toLowerCase()));
       setDeposits((prev) => prev.filter((d) => d.userEmail?.toLowerCase() === account.email.toLowerCase()));
       showToast('🎉 Account registered successfully! Welcome to DataSell.');
     } else {
-      showToast(`Welcome back, ${account.name}!`);
+      showToast(`Welcome back, ${account.name || 'User'}! Balance & data recovered.`);
+      // Restore past withdrawals and deposits returned from server
+      if (serverWithdrawals && serverWithdrawals.length > 0) {
+        setWithdrawals((prev) => {
+          const map = new Map(serverWithdrawals.map((w) => [w.id, w]));
+          const merged = prev.map((w) => map.get(w.id) || w);
+          for (const sw of serverWithdrawals) {
+            if (!merged.some((m) => m.id === sw.id)) merged.unshift(sw);
+          }
+          return merged;
+        });
+      }
+      if (serverDeposits && serverDeposits.length > 0) {
+        setDeposits((prev) => {
+          const map = new Map(serverDeposits.map((d) => [d.id, d]));
+          const merged = prev.map((d) => map.get(d.id) || d);
+          for (const sd of serverDeposits) {
+            if (!merged.some((m) => m.id === sd.id)) merged.unshift(sd);
+          }
+          return merged;
+        });
+      }
     }
 
     setAuthLogs((prev) => [authLog, ...prev]);
     setUsers((prev) => {
       const exists = prev.some((u) => u.id === account.id || u.email.toLowerCase() === account.email.toLowerCase());
       if (exists) {
-        return prev.map((u) => (u.id === account.id ? account : u));
+        return prev.map((u) => (u.id === account.id || u.email.toLowerCase() === account.email.toLowerCase() ? { ...u, ...account } : u));
       }
       return [account, ...prev];
     });
 
-    setUserState({
+    const activeState: UserState = {
       id: account.id,
       email: account.email,
       name: account.name,
       phone: account.phone,
-      balance: account.balance,
-      totalSoldMB: account.totalSoldMB,
+      password: account.password,
+      balance: typeof account.balance === 'number' ? account.balance : (parseFloat(String(account.balance)) || 0),
+      totalSoldMB: typeof account.totalSoldMB === 'number' ? account.totalSoldMB : (parseFloat(String(account.totalSoldMB)) || 0),
       isSelling: false,
-      tier: account.tier,
+      tier: account.tier || calculateTier(account.totalSoldMB || 0),
       savedUpiId: account.savedUpiId,
       selectedPaymentMethod: account.selectedPaymentMethod,
       status: account.status,
@@ -606,31 +635,18 @@ export default function App() {
       hasPaidSpeedTurbo: account.hasPaidSpeedTurbo ?? false,
       speedTurboUtr: account.speedTurboUtr,
       withdrawalCount: account.withdrawalCount ?? 0,
-    });
+    };
 
+    setUserState(activeState);
     setIsLoggedIn(true);
+
     try {
       localStorage.setItem('datasell_is_logged_in', 'true');
+      localStorage.setItem('datasell_user_state', JSON.stringify(activeState));
     } catch (e) {
       console.error(e);
     }
     setIsAuthModalOpen(false);
-
-    if (isNewSignup) {
-      await api.signup({
-        email: account.email,
-        password: account.password,
-        name: account.name,
-        phone: account.phone,
-        device: account.device,
-      });
-    } else {
-      await api.login({
-        email: account.email,
-        password: account.password,
-        device: account.device,
-      });
-    }
   };
 
   const handleLogout = () => {
