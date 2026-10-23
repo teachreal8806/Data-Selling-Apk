@@ -47,7 +47,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -109,26 +109,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (mode === 'SIGNUP') {
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
-      api.signup({
-        email: cleanInput,
-        password,
-        name: name.trim() || cleanInput.split('@')[0],
-        phone: phone.trim() || '+91 98000 00000',
-        device: deviceSignature,
-      }).then((res) => {
+      try {
+        const res = await api.signup({
+          email: cleanInput,
+          password,
+          name: name.trim() || cleanInput.split('@')[0],
+          phone: phone.trim() || '+91 98000 00000',
+          device: deviceSignature,
+        });
         setIsSubmitting(false);
-        if (res.error) {
+        if (res && res.error) {
           setErrorMessage(res.error);
           return;
         }
-        if (res.user) {
-          onAuthSuccess(res.user, res.log, true);
+        if (res && res.user) {
+          onAuthSuccess(res.user, (res as any).log || (res as any).authLog, true);
           onClose();
         }
-      }).catch((err) => {
+      } catch (err) {
         setIsSubmitting(false);
-        setErrorMessage('Unable to register mobile account. Check network connection.');
-      });
+        setErrorMessage('Unable to register mobile account. Please try again.');
+      }
       return;
     }
 
@@ -136,28 +137,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (mode === 'LOGIN') {
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
-      api.login({
-        email: cleanInput,
-        password,
-        device: deviceSignature,
-      }).then((res) => {
+      try {
+        const res = await api.login({
+          email: cleanInput,
+          password,
+          device: deviceSignature,
+        });
         setIsSubmitting(false);
-        if (res.error) {
+        if (res && res.error) {
           setErrorMessage(res.error);
           return;
         }
-        if (res.user) {
+        if (res && res.user) {
           if (res.user.status === 'BLOCKED') {
             setErrorMessage('Your account has been restricted by administrator. Contact Support.');
             return;
           }
-          onAuthSuccess(res.user, res.log, false);
+          onAuthSuccess(res.user, (res as any).log || (res as any).authLog, false);
           onClose();
         }
-      }).catch((err) => {
+      } catch (err) {
         setIsSubmitting(false);
-        setErrorMessage('Unable to login. Check network connection.');
-      });
+        setErrorMessage('Unable to login. Please try again.');
+      }
       return;
     }
   };
