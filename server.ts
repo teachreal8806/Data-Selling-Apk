@@ -351,23 +351,44 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
   });
 });
 
-// Authentication: Login on any mobile
+// Authentication: Login on any mobile with ultra-flexible matching
 app.post('/api/auth/login', (req: Request, res: Response) => {
   const { email, password, device, ip } = req.body;
   const db = getDB();
-  const cleanInput = (email || '').toLowerCase().trim();
+  const rawInput = (email || '').toString().trim();
+  const cleanInput = rawInput.toLowerCase();
   const cleanPass = (password !== undefined && password !== null) ? String(password).trim() : '';
 
-  // Find user by email or by phone number
+  if (!rawInput) {
+    return res.status(400).json({ error: 'Please enter your Mobile Number or Email Address' });
+  }
+
+  // Extract digits for phone search
   const inputDigits = cleanInput.replace(/\D/g, '');
+
+  // Flexible user matching across multiple identifiers
   const user = db.users.find((u: any) => {
     if (!u) return false;
     const uEmail = (u.email || '').toLowerCase().trim();
-    if (uEmail && uEmail === cleanInput) return true;
-    if (cleanInput.length >= 7 && u.phone) {
+    const uId = (u.id || '').trim();
+    const uName = (u.name || '').toLowerCase().trim();
+
+    // 1. Direct email or email prefix match (e.g. "techreal8806" matches "techreal8806@gmail.com")
+    if (uEmail && (uEmail === cleanInput || uEmail.split('@')[0] === cleanInput)) return true;
+    
+    // 2. Direct User ID match (e.g. "usr_admin_default")
+    if (uId && (uId.toLowerCase() === cleanInput || uId === rawInput)) return true;
+
+    // 3. Name match
+    if (uName && uName === cleanInput) return true;
+
+    // 4. Phone number matching (exact digits or last 10 digits)
+    if (u.phone) {
       const uDigits = String(u.phone).replace(/\D/g, '');
-      if (uDigits && inputDigits && (uDigits.endsWith(inputDigits) || inputDigits.endsWith(uDigits))) {
-        return true;
+      if (inputDigits.length >= 7 && uDigits.length >= 7) {
+        if (uDigits === inputDigits) return true;
+        if (uDigits.endsWith(inputDigits) || inputDigits.endsWith(uDigits)) return true;
+        if (uDigits.slice(-10) === inputDigits.slice(-10)) return true;
       }
     }
     return false;
@@ -375,17 +396,20 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
 
   if (!user) {
     return res.status(404).json({ 
-      error: 'Account not found! Please check your email/phone or Sign Up first.',
+      error: 'Account not found! Please check your Mobile Number or Email, or Sign Up first.',
       code: 'USER_NOT_FOUND' 
     });
   }
 
   const userPass = (user.password !== undefined && user.password !== null) ? String(user.password).trim() : '';
   if (userPass && userPass !== cleanPass) {
-    return res.status(401).json({ 
-      error: 'Incorrect password! Please enter the correct password.',
-      code: 'INVALID_PASSWORD' 
-    });
+    // Also check case-insensitive match for password
+    if (userPass.toLowerCase() !== cleanPass.toLowerCase()) {
+      return res.status(401).json({ 
+        error: 'Incorrect password! Please enter the correct password.',
+        code: 'INVALID_PASSWORD' 
+      });
+    }
   }
 
   const now = new Date().toLocaleString('en-IN', {
@@ -429,6 +453,118 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     user,
     withdrawals: userWithdrawals,
     deposits: userDeposits,
+    authLog,
+  });
+});
+
+// Admin provisions/creates new user ID directly
+app.post('/api/admin/create-user', (req: Request, res: Response) => {
+  const { name, email, phone, password, balance, customSellingSpeedMs, customMbPerPacketMin, customMbPerPacketMax, tier } = req.body;
+  const db = getDB();
+
+  const cleanEmail = (email || '').toLowerCase().trim();
+  const cleanPhone = (phone || '').trim();
+  const cleanPass = (password || '').toString().trim() || '1234';
+
+  if (!cleanEmail && !cleanPhone) {
+    return res.status(400).json({ error: 'Email or Mobile Number is required' });
+  }
+
+  const phoneDigits = cleanPhone.replace(/\D/g, '');
+  const finalEmail = cleanEmail || (phoneDigits + '@datasell.in');
+
+  // Check if user already exists by email or phone
+  const existingUser = db.users.find((u: any) => {
+    if (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail) return true;
+    if (phoneDigits && u.phone) {
+      const uDigits = String(u.phone).replace(/\D/g, '');
+      if (uDigits.slice(-10) === phoneDigits.slice(-10)) return true;
+    }
+    return false;
+  });
+
+  const now = new Date().toLocaleString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+  if (existingUser) {
+    if (name) existingUser.name = name.trim();
+    if (cleanPhone) existingUser.phone = cleanPhone;
+    if (cleanPass) existingUser.password = cleanPass;
+    if (balance !== undefined) existingUser.balance = parseFloat(balance) || 0;
+    if (customSellingSpeedMs !== undefined) existingUser.customSellingSpeedMs = Number(customSellingSpeedMs) || undefined;
+    if (customMbPerPacketMin !== undefined) existingUser.customMbPerPacketMin = Number(customMbPerPacketMin) || undefined;
+    if (customMbPerPacketMax !== undefined) existingUser.customMbPerPacketMax = Number(customMbPerPacketMax) || undefined;
+    if (tier) existingUser.tier = tier;
+    existingUser.lastActiveTime = now;
+
+    saveDB(db);
+    return res.json({ 
+      success: true, 
+      isNew: false, 
+      message: 'Existing account updated with new credentials & settings', 
+      user: existingUser 
+    });
+  }
+
+  const newUser = {
+    id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    name: name?.trim() || finalEmail.split('@')[0],
+    email: finalEmail,
+    phone: cleanPhone || '+91 9' + Math.floor(100000000 + Math.random() * 900000000),
+    password: cleanPass,
+    balance: parseFloat(balance) || 0.00,
+    totalSoldMB: 0.00,
+    tier: tier || 'BRONZE',
+    status: 'ACTIVE',
+    savedUpiId: '',
+    selectedPaymentMethod: 'PhonePe',
+    signupTime: now,
+    lastLoginTime: now,
+    lastActiveTime: now,
+    ipAddress: '127.0.0.1 (Admin Created)',
+    device: 'Mobile APK Device',
+    requireDepositBeforeWithdrawal: false,
+    requiredDepositAmount: 200,
+    hasCompletedRequiredDeposit: false,
+    hasPaidAdsActivation: false,
+    hasPaidWithdrawalFee: false,
+    hasPaidSpeedTurbo: false,
+    withdrawalCount: 0,
+    customSellingSpeedMs: customSellingSpeedMs ? Number(customSellingSpeedMs) : undefined,
+    customMbPerPacketMin: customMbPerPacketMin ? Number(customMbPerPacketMin) : undefined,
+    customMbPerPacketMax: customMbPerPacketMax ? Number(customMbPerPacketMax) : undefined,
+  };
+
+  db.users.unshift(newUser);
+
+  const authLog = {
+    id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    userId: newUser.id,
+    userEmail: newUser.email,
+    userName: newUser.name,
+    userPhone: newUser.phone,
+    type: 'SIGNUP',
+    timestamp: now,
+    ipAddress: newUser.ipAddress,
+    device: newUser.device,
+    status: 'SUCCESS',
+  };
+  db.authLogs.unshift(authLog);
+
+  saveDB(db);
+
+  res.json({
+    success: true,
+    isNew: true,
+    message: 'New user ID created and activated successfully',
+    user: newUser,
     authLog,
   });
 });
@@ -500,9 +636,9 @@ app.post('/api/ads/reward', (req: Request, res: Response) => {
   res.json({ success: true, newBalance: user.balance, deposit: adRecord });
 });
 
-// Submit Withdrawal from any mobile
+// Submit Withdrawal from any mobile (UPI or Bank Account)
 app.post('/api/withdrawals', (req: Request, res: Response) => {
-  const { userId, userEmail, amount, method, upiId, orderNumber } = req.body;
+  const { userId, userEmail, amount, method, upiId, bankDetails, orderNumber } = req.body;
   const db = getDB();
   const lowerEmail = (userEmail || '').toLowerCase().trim();
 
@@ -518,7 +654,8 @@ app.post('/api/withdrawals', (req: Request, res: Response) => {
 
   // Deduct balance immediately
   user.balance = parseFloat((user.balance - withdrawAmount).toFixed(2));
-  user.savedUpiId = upiId;
+  if (upiId) user.savedUpiId = upiId;
+  if (bankDetails) user.savedBankDetails = bankDetails;
   user.selectedPaymentMethod = method;
 
   const now = new Date().toLocaleString('en-IN', {
@@ -538,8 +675,9 @@ app.post('/api/withdrawals', (req: Request, res: Response) => {
     userName: user.name,
     orderNumber: orderNumber || 'ORD' + Math.floor(100000000000 + Math.random() * 900000000000),
     amount: withdrawAmount,
-    type: method,
-    upiId: upiId,
+    type: method || req.body.type || (bankDetails ? 'BANK' : 'UPI'),
+    upiId: upiId || '',
+    bankDetails: bankDetails || undefined,
     time: now,
     status: 'PENDING',
     bankReference: '',

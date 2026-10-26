@@ -10,14 +10,25 @@ import {
   ShieldCheck, 
   Lock, 
   ShieldAlert,
-  Coins
+  Coins,
+  Building2,
+  Smartphone,
+  Check,
+  Clock,
+  Zap,
+  Info
 } from 'lucide-react';
-import { UserState } from '../types';
+import { UserState, BankDetails } from '../types';
 
 interface WithdrawViewProps {
   userState: UserState;
   onBack: () => void;
-  onSubmitWithdrawal: (amount: number, upiId: string, method: 'PhonePe' | 'GPay' | 'UPI') => boolean;
+  onSubmitWithdrawal: (
+    amount: number, 
+    upiId: string, 
+    method: 'PhonePe' | 'GPay' | 'UPI' | 'BANK',
+    bankDetails?: BankDetails
+  ) => boolean;
   onGoToHistory: () => void;
   onOpenDeposit?: () => void;
   onOpenWithdrawalFeeModal: () => void;
@@ -37,11 +48,33 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
   const isFirstWithdrawal = (userState.withdrawalCount ?? withdrawalCount) === 0;
   const minWithdrawal = isFirstWithdrawal ? 250 : 500;
 
+  const [payoutChannel, setPayoutChannel] = useState<'UPI' | 'BANK'>(
+    userState.selectedPaymentMethod === 'BANK' ? 'BANK' : 'UPI'
+  );
+
   const [amount, setAmount] = useState<string>(minWithdrawal.toString());
-  const [selectedMethod, setSelectedMethod] = useState<'PhonePe' | 'GPay' | 'UPI'>(
-    userState.selectedPaymentMethod || 'PhonePe'
+  const [selectedUpiApp, setSelectedUpiApp] = useState<'PhonePe' | 'GPay' | 'UPI'>(
+    userState.selectedPaymentMethod === 'BANK' ? 'PhonePe' : (userState.selectedPaymentMethod || 'PhonePe')
   );
   const [upiId, setUpiId] = useState<string>(userState.savedUpiId || '');
+
+  // Bank Form State
+  const [accountHolderName, setAccountHolderName] = useState<string>(
+    userState.savedBankDetails?.accountHolderName || userState.name || ''
+  );
+  const [bankName, setBankName] = useState<string>(
+    userState.savedBankDetails?.bankName || ''
+  );
+  const [accountNumber, setAccountNumber] = useState<string>(
+    userState.savedBankDetails?.accountNumber || ''
+  );
+  const [confirmAccountNumber, setConfirmAccountNumber] = useState<string>(
+    userState.savedBankDetails?.accountNumber || ''
+  );
+  const [ifscCode, setIfscCode] = useState<string>(
+    userState.savedBankDetails?.ifscCode || ''
+  );
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
 
@@ -52,14 +85,26 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
     setErrorMessage(null);
   };
 
+  const handleQuickUpiSuffix = (suffix: string) => {
+    const currentBase = upiId.includes('@') ? upiId.split('@')[0] : upiId;
+    if (currentBase) {
+      setUpiId(currentBase + suffix);
+    } else if (userState.phone) {
+      const cleanPhone = userState.phone.replace(/\D/g, '').slice(-10);
+      setUpiId(cleanPhone + suffix);
+    }
+  };
+
   const handleWithdraw = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    // ₹99 Payment requirement before withdrawal ("withdrawal ke pahle 99 ka payment add kar dijiye sir , utr number bharne ka option add kar dijiyega sir")
+    // ₹99 Payment requirement before withdrawal
     if (!userState.hasPaidWithdrawalFee) {
       if (userState.withdrawalFeePending) {
-        setErrorMessage(`Aapka ₹99 payment verification UTR (${userState.withdrawalFeeUtr || ''}) admin panel me pending hai. Admin ke approve karne ke baad withdrawal release ho jayega.`);
+        setErrorMessage(
+          `Aapka ₹99 payment verification UTR (${userState.withdrawalFeeUtr || ''}) pending hai. Admin approval ke baad payout release hoga.`
+        );
       }
       onOpenWithdrawalFeeModal();
       return;
@@ -86,14 +131,57 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
       return;
     }
 
-    if (!upiId.trim() || !upiId.includes('@')) {
-      setErrorMessage('Please enter a valid UPI ID (e.g., yourname@oksbi or mobile@ybl).');
-      return;
-    }
+    if (payoutChannel === 'UPI') {
+      const cleanUpi = upiId.trim();
+      if (!cleanUpi || !cleanUpi.includes('@')) {
+        setErrorMessage('Please enter a valid UPI ID (e.g. mobile@ybl or username@oksbi).');
+        return;
+      }
 
-    const success = onSubmitWithdrawal(numAmount, upiId.trim(), selectedMethod);
-    if (success) {
-      setShowSuccessModal(true);
+      const success = onSubmitWithdrawal(numAmount, cleanUpi, selectedUpiApp);
+      if (success) {
+        setShowSuccessModal(true);
+      }
+    } else {
+      // Bank Transfer Validation
+      const cleanHolder = accountHolderName.trim();
+      const cleanBank = bankName.trim();
+      const cleanAcc = accountNumber.trim().replace(/\s+/g, '');
+      const cleanConfirm = confirmAccountNumber.trim().replace(/\s+/g, '');
+      const cleanIfsc = ifscCode.trim().toUpperCase();
+
+      if (!cleanHolder || cleanHolder.length < 3) {
+        setErrorMessage('Please enter valid Account Holder Name.');
+        return;
+      }
+      if (!cleanBank || cleanBank.length < 2) {
+        setErrorMessage('Please enter Bank Name (e.g. State Bank of India, HDFC).');
+        return;
+      }
+      if (!cleanAcc || cleanAcc.length < 8) {
+        setErrorMessage('Please enter valid Bank Account Number (minimum 8 digits).');
+        return;
+      }
+      if (cleanAcc !== cleanConfirm) {
+        setErrorMessage('Account numbers do not match! Please check again.');
+        return;
+      }
+      if (!cleanIfsc || cleanIfsc.length !== 11) {
+        setErrorMessage('Please enter a valid 11-character IFSC Code (e.g. SBIN0001234).');
+        return;
+      }
+
+      const bankDetails: BankDetails = {
+        accountHolderName: cleanHolder,
+        bankName: cleanBank,
+        accountNumber: cleanAcc,
+        ifscCode: cleanIfsc,
+      };
+
+      const success = onSubmitWithdrawal(numAmount, '', 'BANK', bankDetails);
+      if (success) {
+        setShowSuccessModal(true);
+      }
     }
   };
 
@@ -102,9 +190,11 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
     onGoToHistory();
   };
 
+  const parsedAmount = parseFloat(amount) || 0;
+
   return (
     <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4 pb-28 text-slate-800">
-      {/* Top Navigation */}
+      {/* Top Header Navigation */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
@@ -119,240 +209,497 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
           {onOpenDeposit && (
             <button
               onClick={onOpenDeposit}
-              className="flex items-center gap-1 text-xs font-bold text-amber-900 hover:text-red-700 bg-amber-100 border border-amber-300 py-1.5 px-3 rounded-xl hover:bg-amber-200 transition-all cursor-pointer min-h-[44px]"
+              className="flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/80 hover:bg-amber-200 border border-amber-300 py-1.5 px-3 rounded-xl transition-all cursor-pointer shadow-xs min-h-[44px]"
             >
-              <QrCode className="w-3.5 h-3.5 text-red-600" />
-              <span>Deposit</span>
+              <QrCode className="w-3.5 h-3.5 text-amber-700" />
+              <span>Deposit / QR</span>
             </button>
           )}
+
           <button
             onClick={onGoToHistory}
-            id="btn-withdraw-view-history"
-            className="text-xs font-bold text-red-600 hover:text-red-800 py-1.5 px-2 transition-all cursor-pointer"
+            id="btn-withdraw-history"
+            className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 py-1.5 px-3 rounded-xl transition-all cursor-pointer shadow-xs min-h-[44px]"
           >
-            Statements ➔
+            <Clock className="w-3.5 h-3.5 text-slate-500" />
+            <span>Statements</span>
           </button>
         </div>
       </div>
 
-      {/* Available Balance Header Card in Red & Yellow Theme */}
-      <div className="bg-gradient-to-br from-red-600 via-rose-600 to-amber-500 rounded-3xl p-5 text-white shadow-xl shadow-red-600/20 border-2 border-yellow-300 space-y-3 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-36 h-36 bg-yellow-300/25 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex items-center justify-between">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-yellow-100 drop-shadow-xs">
-            Available for Withdrawal
-          </span>
-          <span className="text-[10px] text-red-950 bg-yellow-300 px-2.5 py-0.5 rounded-full font-black shadow-xs">
-            Instant 24x7 Payout
-          </span>
+      {/* Ultra Luxe Balance Card */}
+      <div className="relative rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-amber-600 p-5 text-white shadow-xl overflow-hidden border border-yellow-300/40">
+        <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-yellow-400/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-2 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/25 backdrop-blur-md border border-white/20 text-[10px] font-bold tracking-wider">
+          <Zap className="w-3 h-3 text-yellow-300 fill-yellow-300" />
+          <span>INSTANT PAYOUT</span>
         </div>
 
-        <div className="relative z-10 flex items-baseline gap-1">
-          <span className="text-2xl font-bold text-yellow-300">₹</span>
-          <span className="text-4xl font-black text-white font-mono tabular-nums drop-shadow-md">
-            {userState.balance.toFixed(2)}
-          </span>
+        <div className="text-[11px] font-medium text-amber-100 uppercase tracking-widest mb-1">
+          Withdrawable Balance
+        </div>
+        <div className="text-3xl font-black tabular-nums tracking-tight text-white mb-2">
+          ₹{userState.balance.toFixed(2)}
         </div>
 
-        {/* Withdrawal threshold meter with First time ₹250 vs Second time ₹500 */}
-        <div className="relative z-10 pt-2 border-t border-white/20">
-          <div className="flex justify-between text-[11px] text-yellow-100 mb-1 font-bold">
-            <span>
-              {isFirstWithdrawal ? '1st Withdrawal Min: ₹250.00' : '2nd+ Withdrawal Min: ₹500.00'}
-            </span>
-            <span className={userState.balance >= minWithdrawal ? 'text-yellow-200 font-extrabold' : 'text-white/70'}>
-              {userState.balance >= minWithdrawal ? 'Eligible for instant payout' : `Need ₹${(minWithdrawal - userState.balance).toFixed(2)} more`}
-            </span>
+        <div className="flex items-center justify-between text-xs text-white/90 pt-3 border-t border-white/20">
+          <div className="flex items-center gap-1.5">
+            <Coins className="w-3.5 h-3.5 text-yellow-300" />
+            <span>Bandwidth Sold: <strong>{userState.totalSoldMB.toFixed(2)} MB</strong></span>
           </div>
-          <div className="w-full h-2 rounded-full bg-black/20 overflow-hidden">
-            <div 
-              className="h-full bg-yellow-300 rounded-full transition-all shadow-xs"
-              style={{ width: `${Math.min(100, (userState.balance / minWithdrawal) * 100)}%` }}
-            />
-          </div>
+          <span className="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold text-yellow-200">
+            {isFirstWithdrawal ? '1st Payout: Min ₹250' : 'Min ₹500 Payout'}
+          </span>
         </div>
       </div>
 
-      {/* Mandatory ₹99 Payment Notice & UTR Gate ("withdrawal ke pahle 99 ka payment add kar dijiye sir , utr number bharne ka option add kar dijiyega sir") */}
-      {!userState.hasPaidWithdrawalFee ? (
-        <div className="bg-gradient-to-r from-red-50 via-amber-50 to-red-50 border-2 border-amber-400 rounded-2xl p-4 space-y-3 shadow-md">
-          <div className="flex items-start gap-2.5">
-            <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-950 leading-relaxed">
-              <p className="font-black text-sm mb-1 text-red-950">
-                {userState.withdrawalFeePending ? '⏳ ₹99 Payout Verification Pending (Admin Approval)' : '₹99 Payout Verification Gate Pending'}
-              </p>
-              {userState.withdrawalFeePending
-                ? `Aapka ₹99 Verification Fee UTR (${userState.withdrawalFeeUtr || 'Submitted'}) admin panel me pending hai. Admin approval milte hi automated payout server se release ho jayega.`
-                : 'Withdrawal release ke liye banking security verification rule ke anusar ₹99 fee transfer karein aur 12-digit UTR reference bharein.'}
+      {/* Security Fee Status Banner */}
+      {!userState.hasPaidWithdrawalFee && (
+        <div 
+          onClick={onOpenWithdrawalFeeModal}
+          className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300 flex items-start gap-3 cursor-pointer hover:bg-amber-100/70 transition-all shadow-xs"
+        >
+          <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center text-white shrink-0 mt-0.5 shadow-xs">
+            <Lock className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black text-amber-950">
+                ₹99 Payout Verification Fee Required
+              </h4>
+              <span className="text-[10px] font-extrabold text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-md">
+                1-Time Only
+              </span>
             </div>
+            <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+              Tap here to scan QR & enter your 12-digit UTR to unlock instant payouts to UPI or Bank Account.
+            </p>
           </div>
-
-          <button
-            onClick={onOpenWithdrawalFeeModal}
-            className={`w-full py-3 px-4 rounded-xl text-white font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95 border border-yellow-300 ${
-              userState.withdrawalFeePending
-                ? 'bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700'
-                : 'bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400'
-            }`}
-          >
-            <QrCode className="w-4 h-4 text-yellow-300" />
-            <span>
-              {userState.withdrawalFeePending
-                ? `⏳ Verification Pending (Check / Re-enter UTR)`
-                : 'Pay ₹99 & Enter 12-Digit UTR to Unlock'}
-            </span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ) : (
-        <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-900 shadow-xs">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="font-bold">₹99 Verification Fee Verified & Payout Server Unlocked!</span>
-          </div>
-          <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-            UTR: {userState.withdrawalFeeUtr ? `${userState.withdrawalFeeUtr.substring(0, 8)}...` : 'VERIFIED'}
-          </span>
         </div>
       )}
 
-      {/* Withdrawal Form */}
-      <form onSubmit={handleWithdraw} className="bg-white rounded-3xl p-5 border-2 border-amber-200/90 shadow-md space-y-4">
-        <div className="flex items-center justify-between border-b border-amber-100 pb-2">
-          <h3 className="text-xs font-black uppercase tracking-wider text-red-950">
-            Payout Method & Bank Details
-          </h3>
-          <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-            Min: ₹{minWithdrawal} ({isFirstWithdrawal ? '1st Payout' : '2nd+ Payout'})
-          </span>
+      {userState.hasPaidWithdrawalFee && (
+        <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-emerald-800 text-xs font-bold">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>₹99 Payout Security Verified • Instant Direct Settlement Enabled</span>
         </div>
+      )}
 
-        {errorMessage && (
-          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="font-semibold">{errorMessage}</span>
-          </div>
-        )}
+      {/* Main Payout Form Card */}
+      <div className="rounded-3xl bg-white border border-slate-200 shadow-md p-5 space-y-4">
+        {/* Channel Selection: 2 High-Visibility Cards */}
+        <div>
+          <label className="block text-xs font-black text-slate-800 mb-2 uppercase tracking-wider flex items-center justify-between">
+            <span>Choose Payout Method (पैसे निकालने का तरीका)</span>
+            <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
+              2 Methods Available
+            </span>
+          </label>
 
-        {/* Payment Method Switcher in Red & Yellow Theme */}
-        <div className="grid grid-cols-3 gap-2">
-          {(['PhonePe', 'GPay', 'UPI'] as const).map((m) => (
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* Card 1: UPI */}
             <button
-              key={m}
               type="button"
-              onClick={() => setSelectedMethod(m)}
-              className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                selectedMethod === m
-                  ? 'bg-amber-100 border-amber-400 text-red-950 font-black shadow-xs'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              onClick={() => {
+                setPayoutChannel('UPI');
+                setErrorMessage(null);
+              }}
+              className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer relative ${
+                payoutChannel === 'UPI'
+                  ? 'border-red-600 bg-gradient-to-br from-red-50 to-amber-50 shadow-md ring-2 ring-red-500/20'
+                  : 'border-slate-200 bg-white hover:border-slate-300 opacity-80'
               }`}
             >
-              {m}
+              <div className="flex items-center justify-between mb-1.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                  payoutChannel === 'UPI' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                {payoutChannel === 'UPI' && (
+                  <span className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <span className="font-black text-xs block text-slate-900">UPI Transfer</span>
+              <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                PhonePe, GPay, Paytm, BHIM
+              </span>
+              <span className="inline-block mt-1.5 px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-bold text-[9px]">
+                Instant 5-Min
+              </span>
             </button>
-          ))}
+
+            {/* Card 2: Bank Account */}
+            <button
+              type="button"
+              onClick={() => {
+                setPayoutChannel('BANK');
+                setErrorMessage(null);
+              }}
+              className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer relative ${
+                payoutChannel === 'BANK'
+                  ? 'border-red-600 bg-gradient-to-br from-red-50 to-amber-50 shadow-md ring-2 ring-red-500/20'
+                  : 'border-slate-200 bg-white hover:border-slate-300 opacity-80'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                  payoutChannel === 'BANK' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  <Building2 className="w-4 h-4" />
+                </div>
+                {payoutChannel === 'BANK' && (
+                  <span className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <span className="font-black text-xs block text-slate-900">Bank Account</span>
+              <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                Direct IMPS / NEFT Transfer
+              </span>
+              <span className="inline-block mt-1.5 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 font-bold text-[9px]">
+                All Banks (SBI/HDFC/PNB)
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Quick Amount Selection in Red/Yellow */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
-            <label className="block text-xs font-bold text-slate-800">Select Withdrawal Amount (₹)</label>
-            <span className="text-[10px] font-mono font-bold text-red-600">
-              Min ₹{minWithdrawal}
+        {/* Withdrawal Amount Input */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+              Enter Amount (₹)
+            </label>
+            <span className="text-[11px] font-bold text-slate-500">
+              Min: ₹{minWithdrawal}
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            {quickAmounts.map((val) => (
+
+          <div className="relative rounded-2xl border-2 border-slate-200 bg-slate-50 focus-within:border-red-500 focus-within:bg-white transition-all overflow-hidden">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">
+              ₹
+            </span>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setErrorMessage(null);
+              }}
+              min={minWithdrawal}
+              max={userState.balance}
+              placeholder={minWithdrawal.toString()}
+              className="w-full pl-9 pr-4 py-3 text-lg font-black text-slate-900 bg-transparent focus:outline-hidden tabular-nums"
+            />
+          </div>
+
+          {/* Quick Amount Chips */}
+          <div className="grid grid-cols-4 gap-1.5 mt-2.5">
+            {quickAmounts.map((q) => (
               <button
+                key={q}
                 type="button"
-                key={val}
-                onClick={() => handleQuickAmount(val)}
-                className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all cursor-pointer font-mono border ${
-                  amount === val.toString()
-                    ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white border-transparent shadow-xs font-black'
-                    : 'bg-amber-50/50 text-slate-800 border-amber-200 hover:bg-amber-100'
+                onClick={() => handleQuickAmount(q)}
+                className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[38px] ${
+                  parsedAmount === q
+                    ? 'bg-amber-100 border border-amber-400 text-red-950 font-black shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
                 }`}
               >
-                ₹{val}
+                ₹{q}
               </button>
             ))}
           </div>
-
-          <div className="relative mt-2">
-            <input
-              type="number"
-              min={minWithdrawal}
-              max={userState.balance}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
-              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-amber-300 text-sm font-mono font-bold text-slate-900 bg-white focus:outline-hidden focus:border-red-500"
-            />
-            {userState.balance > 0 && (
-              <button
-                type="button"
-                onClick={() => setAmount(Math.floor(userState.balance).toString())}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] font-black text-red-700 bg-amber-100 hover:bg-amber-200 rounded-lg cursor-pointer"
-              >
-                MAX
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* UPI ID Input */}
-        <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-800">Beneficiary UPI ID</label>
-          <input
-            type="text"
-            required
-            value={upiId}
-            onChange={(e) => setUpiId(e.target.value)}
-            placeholder="e.g. mobile@ybl or name@oksbi"
-            className="w-full px-3.5 py-2.5 rounded-xl border-2 border-amber-300 text-sm font-mono text-slate-900 bg-white focus:outline-hidden focus:border-red-500"
-          />
-          <p className="text-[10px] text-slate-500">Money will be transferred directly to this bank account via NPCI UPI rails.</p>
+        {/* CHANNEL 1: UPI Transfer Form */}
+        {payoutChannel === 'UPI' && (
+          <div className="space-y-3 pt-2 border-t border-slate-100">
+            {/* Preferred UPI App */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-2 uppercase tracking-wider">
+                Select UPI App
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'PhonePe' as const, label: 'PhonePe', color: 'border-purple-300 text-purple-900 bg-purple-50/50' },
+                  { id: 'GPay' as const, label: 'Google Pay', color: 'border-blue-300 text-blue-900 bg-blue-50/50' },
+                  { id: 'UPI' as const, label: 'BHIM / Paytm', color: 'border-teal-300 text-teal-900 bg-teal-50/50' }
+                ].map((app) => (
+                  <button
+                    key={app.id}
+                    type="button"
+                    onClick={() => setSelectedUpiApp(app.id)}
+                    className={`py-2.5 px-2 rounded-xl text-xs font-extrabold border transition-all cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5 ${
+                      selectedUpiApp === app.id
+                        ? 'border-2 border-red-600 bg-amber-50 text-red-950 shadow-xs'
+                        : `${app.color} opacity-80 hover:opacity-100`
+                    }`}
+                  >
+                    <span>{app.label}</span>
+                    {selectedUpiApp === app.id && <Check className="w-3.5 h-3.5 text-red-600" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* UPI ID input */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-1.5 uppercase tracking-wider">
+                Enter VPA / UPI ID
+              </label>
+              <div className="relative rounded-2xl border border-slate-200 bg-slate-50 focus-within:border-red-500 focus-within:bg-white transition-all">
+                <input
+                  type="text"
+                  value={upiId}
+                  onChange={(e) => {
+                    setUpiId(e.target.value);
+                    setErrorMessage(null);
+                  }}
+                  placeholder="e.g. 9876543210@ybl or name@oksbi"
+                  className="w-full px-3.5 py-3 text-xs font-bold text-slate-900 bg-transparent focus:outline-hidden font-mono"
+                />
+              </div>
+
+              {/* Quick UPI Handles */}
+              <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1 text-[10px] font-bold">
+                <span className="text-slate-400 shrink-0">Suggestions:</span>
+                {['@ybl', '@oksbi', '@okhdfcbank', '@paytm', '@ibl'].map((sfx) => (
+                  <button
+                    key={sfx}
+                    type="button"
+                    onClick={() => handleQuickUpiSuffix(sfx)}
+                    className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 shrink-0 cursor-pointer border border-slate-200"
+                  >
+                    {sfx}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CHANNEL 2: Bank Account Form */}
+        {payoutChannel === 'BANK' && (
+          <div className="space-y-3.5 pt-2 border-t border-slate-100">
+            {/* Quick Popular Bank Chips */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Popular Banks (बैंक चुनें)
+                </label>
+                <span className="text-[10px] text-slate-500 font-bold">1-Tap Select</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { name: 'SBI', fullName: 'State Bank of India', ifscPrefix: 'SBIN' },
+                  { name: 'HDFC', fullName: 'HDFC Bank', ifscPrefix: 'HDFC' },
+                  { name: 'PNB', fullName: 'Punjab National Bank', ifscPrefix: 'PUNB' },
+                  { name: 'ICICI', fullName: 'ICICI Bank', ifscPrefix: 'ICIC' },
+                  { name: 'BOB', fullName: 'Bank of Baroda', ifscPrefix: 'BARB' },
+                  { name: 'Axis', fullName: 'Axis Bank', ifscPrefix: 'UTIB' },
+                  { name: 'Canara', fullName: 'Canara Bank', ifscPrefix: 'CNRB' },
+                  { name: 'Kotak', fullName: 'Kotak Mahindra Bank', ifscPrefix: 'KKBK' },
+                ].map((b) => (
+                  <button
+                    key={b.name}
+                    type="button"
+                    onClick={() => {
+                      setBankName(b.fullName);
+                      if (!ifscCode || ifscCode.length < 4) {
+                        setIfscCode(b.ifscPrefix);
+                      }
+                      setErrorMessage(null);
+                    }}
+                    className={`py-1.5 px-2 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                      bankName.toLowerCase().includes(b.name.toLowerCase())
+                        ? 'bg-amber-100 border-amber-400 text-red-950 shadow-xs ring-1 ring-amber-400'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Account Holder Name */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-1 uppercase tracking-wider">
+                Account Holder Name (खाताधारक का नाम)
+              </label>
+              <input
+                type="text"
+                value={accountHolderName}
+                onChange={(e) => setAccountHolderName(e.target.value)}
+                placeholder="As per bank passbook / statement"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-red-500 focus:bg-white text-xs font-bold text-slate-900 focus:outline-hidden"
+              />
+            </div>
+
+            {/* Bank Name */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-1 uppercase tracking-wider">
+                Bank Name (बैंक का नाम)
+              </label>
+              <input
+                type="text"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g. State Bank of India, HDFC Bank, PNB"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-red-500 focus:bg-white text-xs font-bold text-slate-900 focus:outline-hidden"
+              />
+            </div>
+
+            {/* Account Number */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-1 uppercase tracking-wider">
+                Account Number (बैंक खाता संख्या)
+              </label>
+              <input
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
+                placeholder="Enter 9-18 digit account number"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-red-500 focus:bg-white text-xs font-bold text-slate-900 focus:outline-hidden font-mono"
+              />
+            </div>
+
+            {/* Confirm Account Number */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-1 uppercase tracking-wider">
+                Confirm Account Number (खाता संख्या दोबारा दर्ज करें)
+              </label>
+              <input
+                type="password"
+                value={confirmAccountNumber}
+                onChange={(e) => setConfirmAccountNumber(e.target.value.replace(/\D/g, ''))}
+                placeholder="Re-enter bank account number"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-red-500 focus:bg-white text-xs font-bold text-slate-900 focus:outline-hidden font-mono"
+              />
+            </div>
+
+            {/* IFSC Code */}
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-1 uppercase tracking-wider">
+                IFSC Code (11-Digit बैंक IFSC कोड)
+              </label>
+              <input
+                type="text"
+                maxLength={11}
+                value={ifscCode}
+                onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                placeholder="e.g. SBIN0001234 or HDFC0000123"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-red-500 focus:bg-white text-xs font-bold text-slate-900 focus:outline-hidden font-mono uppercase"
+              />
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Direct Bank IMPS / NEFT Settlement 24x7 Active</span>
+            </div>
+          </div>
+        )}
+
+        {/* Error Notification */}
+        {errorMessage && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+            <span className="leading-relaxed font-medium">{errorMessage}</span>
+          </div>
+        )}
+
+        {/* Settlement Summary Breakdown */}
+        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+          <div className="flex justify-between text-slate-600 font-medium">
+            <span>Payout Channel:</span>
+            <span className="font-bold text-slate-900">
+              {payoutChannel === 'BANK' ? '🏦 Direct Bank Account (IMPS/NEFT)' : `⚡ UPI Transfer (${selectedUpiApp})`}
+            </span>
+          </div>
+          <div className="flex justify-between text-slate-600 font-medium">
+            <span>Requested Amount:</span>
+            <span className="font-bold text-slate-900">₹{parsedAmount.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-slate-600 font-medium">
+            <span>Platform Fee / TDS:</span>
+            <span className="font-bold text-emerald-600">₹0.00 (Zero Fee)</span>
+          </div>
+          <div className="flex justify-between text-slate-900 font-black text-sm pt-2 border-t border-slate-200">
+            <span>Net Payable to {payoutChannel === 'BANK' ? 'Bank' : 'UPI'}:</span>
+            <span className="text-red-600">₹{parsedAmount.toFixed(2)}</span>
+          </div>
         </div>
 
         {/* Submit Withdrawal Button */}
         <button
-          type="submit"
-          id="btn-confirm-withdraw"
-          className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-sm shadow-xl active:scale-98 transition-all cursor-pointer min-h-[50px] flex items-center justify-center gap-2 border border-yellow-300"
+          type="button"
+          onClick={handleWithdraw}
+          id="btn-submit-withdrawal"
+          className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-red-600/25 transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2 border border-yellow-300/30"
         >
-          <CreditCard className="w-4 h-4 text-yellow-300" />
-          <span>Confirm Withdrawal (₹{parseFloat(amount) || 0})</span>
+          {payoutChannel === 'BANK' ? (
+            <>
+              <Building2 className="w-4 h-4 text-yellow-300" />
+              <span>Confirm & Transfer ₹{parsedAmount.toFixed(2)} to Bank Account (बैंक खाते में भेजें)</span>
+              <ArrowRight className="w-4 h-4" />
+            </>
+          ) : (
+            <>
+              <Smartphone className="w-4 h-4 text-yellow-300" />
+              <span>Confirm & Transfer ₹{parsedAmount.toFixed(2)} via UPI (UPI में भेजें)</span>
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
         </button>
 
-        {/* Payout Security Guarantee */}
-        <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>256-Bit NPCI Encrypted UPI Payout Rails</span>
-        </div>
-      </form>
+        <p className="text-[11px] text-center text-slate-400">
+          ⚡ 24/7 automated gateway • Direct UPI / Bank NEFT settlement
+        </p>
+      </div>
 
-      {/* Success Modal */}
+      {/* SUCCESS CONFIRMATION MODAL */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 border-2 border-amber-400 max-w-sm w-full text-center space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-red-600 mx-auto shadow-xs">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-sm rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center shadow-inner">
+              <CheckCircle2 className="w-10 h-10" />
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-lg font-black text-slate-900">Withdrawal Initiated!</h3>
-              <p className="text-xs text-slate-600">
-                Your request for ₹{parseFloat(amount).toFixed(2)} to{' '}
-                <span className="font-mono font-bold text-red-600">{upiId}</span> has been dispatched to banking settlement.
+            <div>
+              <h3 className="text-lg font-black text-slate-900">
+                Withdrawal Queued!
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Your payout request of <strong>₹{parsedAmount.toFixed(2)}</strong> has been sent to our central payment engine for {payoutChannel === 'BANK' ? 'Bank Account' : 'UPI'} transfer.
               </p>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-left text-xs space-y-1 font-mono">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-sans">Method:</span>
+                <span className="font-bold text-slate-900">{payoutChannel}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-sans">Target:</span>
+                <span className="font-bold text-slate-900 truncate max-w-[180px]">
+                  {payoutChannel === 'BANK' ? `${bankName} (${accountNumber.slice(-4)})` : upiId}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-sans">Status:</span>
+                <span className="font-bold text-amber-600">PENDING (In Queue)</span>
+              </div>
             </div>
 
             <button
               onClick={handleSuccessOk}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-xs shadow-md transition-all cursor-pointer border border-yellow-300"
+              className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer min-h-[44px]"
             >
-              View Withdrawal Statement
+              View Withdrawal Statements
             </button>
           </div>
         </div>

@@ -103,13 +103,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     }
 
-    if (!cleanInput || (!cleanInput.includes('@') && mode === 'SIGNUP')) {
-      setErrorMessage('Please enter a valid email address.');
+    if (!cleanInput) {
+      setErrorMessage(mode === 'LOGIN' ? 'कृपया अपना 10-अंकों का मोबाइल नंबर या ईमेल आईडी दर्ज करें।' : 'Please enter your Mobile Number or Email Address.');
       return;
     }
 
-    if (password.length < 4) {
-      setErrorMessage('Password must be at least 4 characters long.');
+    if (password.trim().length === 0) {
+      setErrorMessage('Please enter your password.');
       return;
     }
 
@@ -117,12 +117,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (mode === 'SIGNUP') {
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
+      // If user signed up with mobile number without @, format a valid email automatically
+      const signupEmail = cleanInput.includes('@') ? cleanInput : `${cleanInput.replace(/\D/g, '') || cleanInput}@datasell.in`;
       try {
         const res = await api.signup({
-          email: cleanInput,
-          password,
-          name: name.trim() || cleanInput.split('@')[0],
-          phone: phone.trim() || '+91 98000 00000',
+          email: signupEmail,
+          password: password.trim(),
+          name: name.trim() || signupEmail.split('@')[0],
+          phone: phone.trim() || (cleanInput.replace(/\D/g, '').length === 10 ? `+91 ${cleanInput.replace(/\D/g, '')}` : '+91 98000 00000'),
           device: deviceSignature,
         });
         setIsSubmitting(false);
@@ -147,14 +149,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // LOGIN - Strictly validates existing accounts
+    // LOGIN - Flexible matching for 10-digit mobile, email, username or user ID
     if (mode === 'LOGIN') {
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
       try {
         const res = await api.login({
           email: cleanInput,
-          password,
+          password: password.trim(),
           device: deviceSignature,
         });
         setIsSubmitting(false);
@@ -178,7 +180,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
       } catch (err) {
         setIsSubmitting(false);
-        setErrorMessage('Unable to login. Please try again.');
+        setErrorMessage('Unable to login. Please check connection and try again.');
       }
       return;
     }
@@ -362,20 +364,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Email Address
-                </label>
-                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-indigo-500">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-800">
+                    {mode === 'LOGIN' ? 'Mobile Number or Email (मोबाइल नंबर या ईमेल)' : 'Email Address or Mobile'}
+                  </label>
+                  {mode === 'LOGIN' && (
+                    <span className="text-[10px] text-amber-600 font-semibold">10-Digit Mobile / Email</span>
+                  )}
+                </div>
+                <div className="relative rounded-xl border border-slate-300 bg-white focus-within:border-red-500 focus-within:ring-1 focus-within:ring-red-400">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@example.com"
-                    className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden"
+                    placeholder={mode === 'LOGIN' ? "Enter 10-digit Mobile or Email (e.g. 7543355356)" : "user@example.com"}
+                    className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden font-medium"
                   />
                 </div>
+                {mode === 'LOGIN' && (
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    📱 <span className="font-medium text-slate-600">Tip:</span> Main link ya Admin द्वारा दी गई ID या मोबाइल नंबर से तुरंत लॉग इन करें।
+                  </p>
+                )}
               </div>
 
               <div>

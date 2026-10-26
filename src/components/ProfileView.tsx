@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, Lock, LogOut, Sparkles, CheckCircle2, Flame } from 'lucide-react';
-import { UserState } from '../types';
+import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, Lock, LogOut, Sparkles, CheckCircle2, Flame, Building2 } from 'lucide-react';
+import { UserState, BankDetails } from '../types';
 
 interface ProfileViewProps {
   userState: UserState;
@@ -20,6 +20,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [email, setEmail] = useState(userState.email);
   const [phone, setPhone] = useState(userState.phone);
   const [upiId, setUpiId] = useState(userState.savedUpiId);
+  const [bankHolderName, setBankHolderName] = useState(userState.savedBankDetails?.accountHolderName || userState.name || '');
+  const [bankName, setBankName] = useState(userState.savedBankDetails?.bankName || '');
+  const [accountNumber, setAccountNumber] = useState(userState.savedBankDetails?.accountNumber || '');
+  const [ifscCode, setIfscCode] = useState(userState.savedBankDetails?.ifscCode || '');
   const [isSaved, setIsSaved] = useState(false);
 
   // Hidden 10-tap trigger for Master Admin Panel
@@ -49,10 +53,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const updatedBankDetails: BankDetails | undefined = (bankHolderName || accountNumber || ifscCode) ? {
+      accountHolderName: bankHolderName.trim(),
+      bankName: bankName.trim(),
+      accountNumber: accountNumber.trim(),
+      ifscCode: ifscCode.trim().toUpperCase(),
+    } : undefined;
+
     onUpdateProfile({
       email,
       phone,
       savedUpiId: upiId,
+      savedBankDetails: updatedBankDetails,
     });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
@@ -168,6 +180,61 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               placeholder="e.g. yourname@oksbi"
               className="w-full pl-10 pr-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 bg-transparent focus:outline-hidden"
             />
+          </div>
+        </div>
+
+        {/* Bank Account Details */}
+        <div className="pt-3 border-t border-amber-100 space-y-3">
+          <div className="flex items-center gap-1.5 text-xs font-black text-red-950 uppercase tracking-wider">
+            <Building2 className="w-4 h-4 text-red-600" />
+            <span>Bank Account for Direct Payouts (बैंक खाता)</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">A/C Holder Name (खाताधारक का नाम)</label>
+              <input
+                type="text"
+                value={bankHolderName}
+                onChange={(e) => setBankHolderName(e.target.value)}
+                placeholder="e.g. Deepak Kumar"
+                className="w-full px-3 py-2 text-xs rounded-xl border-2 border-amber-200 focus:border-red-500 bg-white text-slate-900 font-bold focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">Bank Name (बैंक का नाम)</label>
+              <input
+                type="text"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g. State Bank of India"
+                className="w-full px-3 py-2 text-xs rounded-xl border-2 border-amber-200 focus:border-red-500 bg-white text-slate-900 font-bold focus:outline-hidden"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">Account Number (खाता संख्या)</label>
+              <input
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
+                placeholder="e.g. 30894729103"
+                className="w-full px-3 py-2 text-xs rounded-xl border-2 border-amber-200 focus:border-red-500 bg-white text-slate-900 font-mono font-bold focus:outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">IFSC Code (11-अक्षरों का कोड)</label>
+              <input
+                type="text"
+                maxLength={11}
+                value={ifscCode}
+                onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                placeholder="e.g. SBIN0001234"
+                className="w-full px-3 py-2 text-xs rounded-xl border-2 border-amber-200 focus:border-red-500 bg-white text-slate-900 font-mono font-bold focus:outline-hidden uppercase"
+              />
+            </div>
           </div>
         </div>
 

@@ -5,14 +5,22 @@ export interface DataPacket {
   amount: number;
 }
 
+export interface BankDetails {
+  accountHolderName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+}
+
 export interface WithdrawalRecord {
   id: string;
   userId?: string;
   userEmail?: string;
   orderNumber: string;
   amount: number;
-  type: 'UPI' | 'PhonePe' | 'GPay';
-  upiId: string;
+  type: 'UPI' | 'PhonePe' | 'GPay' | 'BANK';
+  upiId?: string;
+  bankDetails?: BankDetails;
   time: string;
   status: 'PENDING' | 'SUCCESSFUL' | 'REJECTED';
   rejectionReason?: string;
@@ -31,7 +39,8 @@ export interface UserAccount {
   tier: 'BRONZE' | 'SILVER' | 'GOLD';
   status: 'ACTIVE' | 'BLOCKED';
   savedUpiId: string;
-  selectedPaymentMethod: 'PhonePe' | 'GPay' | 'UPI';
+  selectedPaymentMethod: 'PhonePe' | 'GPay' | 'UPI' | 'BANK';
+  savedBankDetails?: BankDetails;
   signupTime: string;
   lastLoginTime: string;
   ipAddress: string;
@@ -52,6 +61,10 @@ export interface UserAccount {
   speedTurboPending?: boolean;
   withdrawalCount?: number; // count of completed/initiated withdrawals (1st = min 250, 2nd+ = min 500)
   lastActiveTime?: string; // Real-time timestamp of mobile activity / packet streaming
+  // Custom Data Selling Speed configured by Admin per user
+  customSellingSpeedMs?: number; // Milliseconds per packet (e.g. 1000 for Super Fast, 2000, 4500)
+  customMbPerPacketMin?: number; // Custom min MB per packet
+  customMbPerPacketMax?: number; // Custom max MB per packet
 }
 
 export interface AuthLog {
@@ -161,7 +174,8 @@ export interface UserState {
   isSelling: boolean;
   tier: 'BRONZE' | 'SILVER' | 'GOLD';
   savedUpiId: string;
-  selectedPaymentMethod: 'PhonePe' | 'GPay' | 'UPI';
+  selectedPaymentMethod: 'PhonePe' | 'GPay' | 'UPI' | 'BANK';
+  savedBankDetails?: BankDetails;
   status?: 'ACTIVE' | 'BLOCKED';
   // Per-user deposit requirement before withdrawal
   requireDepositBeforeWithdrawal?: boolean;
@@ -180,5 +194,8 @@ export interface UserState {
   withdrawalCount?: number;
   password?: string;
   lastActiveTime?: string;
+  customSellingSpeedMs?: number;
+  customMbPerPacketMin?: number;
+  customMbPerPacketMax?: number;
 }
 

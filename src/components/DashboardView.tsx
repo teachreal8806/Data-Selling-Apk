@@ -119,12 +119,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             id="btn-card-quick-withdraw"
             onClick={onOpenWithdraw}
-            className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 hover:from-yellow-200 hover:to-amber-200 text-red-950 text-xs font-black flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer shadow-lg min-h-[44px] border border-yellow-200"
+            className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 hover:from-yellow-200 hover:to-amber-200 text-red-950 text-xs font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-lg min-h-[44px] border border-yellow-200"
           >
             <CreditCard className="w-4 h-4 text-red-900" />
-            <span>Withdraw Cash</span>
+            <span>Withdraw (UPI / Bank)</span>
             <ArrowRight className="w-3.5 h-3.5 text-red-900" />
           </button>
+        </div>
+
+        {/* Dual Channel Indicator Chips */}
+        <div className="relative z-10 mt-2.5 flex items-center justify-center gap-2 text-[10px] font-black">
+          <span 
+            onClick={onOpenWithdraw}
+            className="px-2 py-0.5 rounded-full bg-black/25 text-yellow-200 border border-yellow-200/30 cursor-pointer hover:bg-black/40 transition-colors"
+          >
+            ⚡ UPI (PhonePe/GPay)
+          </span>
+          <span className="text-yellow-200">•</span>
+          <span 
+            onClick={onOpenWithdraw}
+            className="px-2 py-0.5 rounded-full bg-black/25 text-yellow-200 border border-yellow-200/30 cursor-pointer hover:bg-black/40 transition-colors"
+          >
+            🏦 Direct Bank Account (IMPS)
+          </span>
         </div>
       </div>
 

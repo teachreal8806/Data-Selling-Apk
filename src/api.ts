@@ -221,13 +221,19 @@ export const api = {
     return null;
   },
 
-  // Submit withdrawal from any mobile
+  // Submit withdrawal from any mobile (UPI or Bank Account)
   async requestWithdrawal(data: {
     userId?: string;
     userEmail: string;
     amount: number;
     method: string;
-    upiId: string;
+    upiId?: string;
+    bankDetails?: {
+      accountHolderName: string;
+      bankName: string;
+      accountNumber: string;
+      ifscCode: string;
+    };
     orderNumber?: string;
   }) {
     try {
@@ -239,10 +245,44 @@ export const api = {
       if (res.ok) {
         return await res.json();
       }
+      const err = await res.json().catch(() => null);
+      return { error: err?.error || 'Withdrawal request failed' };
     } catch (e) {
       console.warn('API requestWithdrawal offline', e);
+      return { error: 'Network connection error' };
     }
-    return null;
+  },
+
+  // ADMIN: Provision/Create a brand new user directly from Admin Panel
+  async adminCreateUser(data: {
+    name: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    balance?: number;
+    customSellingSpeedMs?: number;
+    customMbPerPacketMin?: number;
+    customMbPerPacketMax?: number;
+    tier?: string;
+    hasPaidAdsActivation?: boolean;
+    hasPaidWithdrawalFee?: boolean;
+    hasPaidSpeedTurbo?: boolean;
+  }) {
+    try {
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      const err = await res.json().catch(() => null);
+      return { error: err?.error || 'Failed to create user ID on central server' };
+    } catch (e) {
+      console.error('API adminCreateUser network error', e);
+      return { error: 'Network error connecting to central server. Please check internet connection.' };
+    }
   },
 
   // Submit deposit

@@ -24,20 +24,51 @@
   },
   "users": [
     {
+      "id": "usr_1793025355000_a3dl",
+      "name": "Rohan Verma",
+      "email": "9876501234@datasell.in",
+      "phone": "9876501234",
+      "password": "9999",
+      "balance": 50,
+      "totalSoldMB": 0,
+      "tier": "BRONZE",
+      "status": "ACTIVE",
+      "savedUpiId": "",
+      "signupTime": "26/10/2026, 02:35:54 pm",
+      "lastLoginTime": "26/10/2026, 02:36:01 pm",
+      "lastActiveTime": "26/10/2026, 02:36:01 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "requireDepositBeforeWithdrawal": false,
+      "requiredDepositAmount": 200,
+      "hasCompletedRequiredDeposit": false,
+      "hasPaidAdsActivation": false,
+      "hasPaidWithdrawalFee": false,
+      "hasPaidSpeedTurbo": false,
+      "withdrawalCount": 0,
+      "customSellingSpeedMs": 1000,
+      "savedBankDetails": {
+        "accountHolderName": "Rohan Verma",
+        "bankName": "State Bank of India",
+        "accountNumber": "30894729103",
+        "ifscCode": "SBIN0001234"
+      }
+    },
+    {
       "id": "usr_admin_default",
       "name": "Deepak Kumar",
       "email": "techreal8806@gmail.com",
       "phone": "7543355356",
       "password": "1234",
-      "balance": 450,
+      "balance": 100,
       "totalSoldMB": 450,
       "tier": "SILVER",
       "status": "ACTIVE",
       "savedUpiId": "techreal8806@oksbi",
-      "selectedPaymentMethod": "PhonePe",
+      "selectedPaymentMethod": "BANK",
       "signupTime": "04/09/2026, 09:15:00 am",
-      "lastLoginTime": "23/10/2026, 03:04:03 pm",
-      "lastActiveTime": "23/10/2026, 03:04:03 pm",
+      "lastLoginTime": "26/10/2026, 02:34:52 pm",
+      "lastActiveTime": "26/10/2026, 02:34:52 pm",
       "ipAddress": "127.0.0.1",
       "device": "Desktop Browser",
       "requireDepositBeforeWithdrawal": false,
@@ -46,7 +77,13 @@
       "hasPaidAdsActivation": true,
       "hasPaidWithdrawalFee": true,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 1
+      "withdrawalCount": 1,
+      "savedBankDetails": {
+        "accountHolderName": "Deepak Kumar",
+        "bankName": "Punjab National Bank",
+        "accountNumber": "0192000100234567",
+        "ifscCode": "PUNB0019200"
+      }
     },
     {
       "id": "usr_1792761316511_hnyn",
@@ -201,6 +238,63 @@
   ],
   "withdrawals": [
     {
+      "id": "wd_1793026286139_ju8w",
+      "userId": "usr_admin_default",
+      "userEmail": "techreal8806@gmail.com",
+      "userName": "Deepak Kumar",
+      "orderNumber": "ORD235988636385",
+      "amount": 250,
+      "type": "BANK",
+      "upiId": "",
+      "bankDetails": {
+        "accountHolderName": "Deepak Kumar",
+        "bankName": "Punjab National Bank",
+        "accountNumber": "0192000100234567",
+        "ifscCode": "PUNB0019200"
+      },
+      "time": "26/10/2026, 02:51:26 pm",
+      "status": "PENDING",
+      "bankReference": ""
+    },
+    {
+      "id": "wd_1793025459573_4vk9",
+      "userId": "usr_admin_default",
+      "userEmail": "techreal8806@gmail.com",
+      "userName": "Deepak Kumar",
+      "orderNumber": "ORD419854080974",
+      "amount": 100,
+      "type": "BANK",
+      "upiId": "",
+      "bankDetails": {
+        "accountHolderName": "Deepak Kumar",
+        "bankName": "State Bank of India",
+        "accountNumber": "30894729103",
+        "ifscCode": "SBIN0001234"
+      },
+      "time": "26/10/2026, 02:37:39 pm",
+      "status": "PENDING",
+      "bankReference": ""
+    },
+    {
+      "id": "wd_1793025367205_7him",
+      "userId": "usr_1793025355000_a3dl",
+      "userEmail": "9876501234@datasell.in",
+      "userName": "Rohan Verma",
+      "orderNumber": "ORD909967393726",
+      "amount": 250,
+      "type": "UPI",
+      "upiId": "",
+      "bankDetails": {
+        "accountHolderName": "Rohan Verma",
+        "bankName": "State Bank of India",
+        "accountNumber": "30894729103",
+        "ifscCode": "SBIN0001234"
+      },
+      "time": "26/10/2026, 02:36:07 pm",
+      "status": "PENDING",
+      "bankReference": ""
+    },
+    {
       "id": "wd_prev_101",
       "userId": "usr_admin_default",
       "userEmail": "techreal8806@gmail.com",
@@ -214,6 +308,42 @@
   ],
   "deposits": [],
   "authLogs": [
+    {
+      "id": "log_1793025361013_lrg6",
+      "userId": "usr_1793025355000_a3dl",
+      "userEmail": "9876501234@datasell.in",
+      "userName": "Rohan Verma",
+      "userPhone": "9876501234",
+      "type": "LOGIN",
+      "timestamp": "26/10/2026, 02:36:01 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "log_1793025355000_knad",
+      "userId": "usr_1793025355000_a3dl",
+      "userEmail": "9876501234@datasell.in",
+      "userName": "Rohan Verma",
+      "userPhone": "9876501234",
+      "type": "SIGNUP",
+      "timestamp": "26/10/2026, 02:35:54 pm",
+      "ipAddress": "127.0.0.1 (Admin Created)",
+      "device": "Mobile APK Device",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "log_1793025292912_itdg",
+      "userId": "usr_admin_default",
+      "userEmail": "techreal8806@gmail.com",
+      "userName": "Deepak Kumar",
+      "userPhone": "7543355356",
+      "type": "LOGIN",
+      "timestamp": "26/10/2026, 02:34:52 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
     {
       "id": "log_1792767843246_ypg8",
       "userId": "usr_admin_default",

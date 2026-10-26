@@ -289,6 +289,10 @@ export default function App() {
             speedTurboUtr: data.user.speedTurboUtr,
             speedTurboPending: data.user.speedTurboPending ?? false,
             withdrawalCount: data.user.withdrawalCount !== undefined ? data.user.withdrawalCount : prev.withdrawalCount,
+            customSellingSpeedMs: data.user.customSellingSpeedMs,
+            customMbPerPacketMin: data.user.customMbPerPacketMin,
+            customMbPerPacketMax: data.user.customMbPerPacketMax,
+            savedBankDetails: data.user.savedBankDetails || prev.savedBankDetails,
           }));
         }
         if (data.withdrawals) {
@@ -333,18 +337,18 @@ export default function App() {
     }
   }, [users, userState, topEarners, authLogs, deposits, packets, withdrawals, systemConfig, supportConfig, depositConfig]);
 
-  // Live Bandwidth Selling Engine with 5G Turbo Boost
+  // Live Bandwidth Selling Engine with Per-User Custom Speed & 5G Turbo Boost
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
     if (userState.isSelling) {
-      // 5G Turbo Speed: 1000ms interval + 0.85-2.25 MB packets for ultra fast selling
+      // Prioritize Admin's custom speed set on this user, then turbo boost, then system default
       const isTurbo = !!userState.hasPaidSpeedTurbo;
-      const speed = isTurbo ? 1000 : (systemConfig.sellingSpeedMs || 4500);
+      const speed = userState.customSellingSpeedMs || (isTurbo ? 1000 : (systemConfig.sellingSpeedMs || 4500));
+      const minMb = userState.customMbPerPacketMin || (isTurbo ? 0.85 : (systemConfig.mbPerPacketMin || 0.15));
+      const maxMb = userState.customMbPerPacketMax || (isTurbo ? 2.25 : (systemConfig.mbPerPacketMax || 0.45));
 
       interval = setInterval(() => {
-        const minMb = isTurbo ? 0.85 : (systemConfig.mbPerPacketMin || 0.15);
-        const maxMb = isTurbo ? 2.25 : (systemConfig.mbPerPacketMax || 0.45);
         const mbIncrement = parseFloat((Math.random() * (maxMb - minMb) + minMb).toFixed(2));
         const rate = systemConfig.ratePerMb || 1.00;
         const amountIncrement = parseFloat((mbIncrement * rate).toFixed(2));
@@ -380,7 +384,7 @@ export default function App() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [userState.isSelling, systemConfig.sellingSpeedMs, systemConfig.ratePerMb, userState.email]);
+  }, [userState.isSelling, userState.customSellingSpeedMs, userState.customMbPerPacketMin, userState.customMbPerPacketMax, userState.hasPaidSpeedTurbo, systemConfig.sellingSpeedMs, systemConfig.ratePerMb, userState.email]);
 
   // Immediately halt bandwidth transmission if admin restricts this mobile
   useEffect(() => {
@@ -497,11 +501,12 @@ export default function App() {
     });
   };
 
-  // Submit withdrawal request across all mobiles
+  // Submit withdrawal request across all mobiles (UPI or Direct Bank Transfer)
   const handleSubmitWithdrawal = async (
     amount: number,
     upiId: string,
-    method: 'PhonePe' | 'GPay' | 'UPI'
+    method: 'PhonePe' | 'GPay' | 'UPI' | 'BANK',
+    bankDetails?: import('./types').BankDetails
   ): Promise<boolean> => {
     if (amount > userState.balance) return false;
 
@@ -528,7 +533,8 @@ export default function App() {
       orderNumber: orderNumber,
       amount: amount,
       type: method,
-      upiId: upiId,
+      upiId: method === 'BANK' ? undefined : upiId,
+      bankDetails: method === 'BANK' ? bankDetails : undefined,
       time: formatDateTime(new Date()),
       status: 'PENDING',
     };
@@ -536,13 +542,18 @@ export default function App() {
     setUserState((prev) => ({
       ...prev,
       balance: parseFloat((prev.balance - amount).toFixed(2)),
-      savedUpiId: upiId,
+      savedUpiId: upiId || prev.savedUpiId,
+      savedBankDetails: bankDetails || prev.savedBankDetails,
       selectedPaymentMethod: method,
       withdrawalCount: (prev.withdrawalCount ?? count) + 1,
     }));
 
     setWithdrawals((prev) => [newRecord, ...prev]);
-    showToast(`Withdrawal requested! Order ${orderNumber} queued for UPI settlement.`);
+    showToast(
+      method === 'BANK'
+        ? `Withdrawal requested! Order ${orderNumber} queued for Bank Account settlement.`
+        : `Withdrawal requested! Order ${orderNumber} queued for UPI settlement.`
+    );
 
     await api.requestWithdrawal({
       userId: userState.id,
@@ -550,6 +561,7 @@ export default function App() {
       amount: amount,
       method: method,
       upiId: upiId,
+      bankDetails: bankDetails,
       orderNumber: orderNumber,
     });
 

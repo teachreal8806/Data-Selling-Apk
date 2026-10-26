@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Clock, CheckCircle2, AlertCircle, Copy, Check, Filter, CreditCard } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, AlertCircle, Copy, Check, Filter, CreditCard, Building2, Smartphone } from 'lucide-react';
 import { WithdrawalRecord } from '../types';
 
 interface WithdrawalHistoryViewProps {
@@ -93,7 +93,7 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
       </div>
 
       {/* Record list */}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {filteredRecords.length === 0 ? (
           <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 shadow-xs">
             <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -103,62 +103,110 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
             </p>
           </div>
         ) : (
-          filteredRecords.map((rec) => (
-            <div
-              key={rec.id}
-              className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-slate-900 font-mono">
-                    ₹{rec.amount.toFixed(2)}
-                  </span>
-                  <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-bold">
-                    {rec.method}
-                  </span>
-                </div>
-
-                <span
-                  className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
-                    rec.status === 'SUCCESSFUL'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : rec.status === 'REJECTED'
-                      ? 'bg-rose-50 text-rose-700 border-rose-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                  }`}
-                >
-                  {rec.status === 'SUCCESSFUL' ? 'SETTLED' : rec.status}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1 text-xs">
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Beneficiary UPI:</span>
-                  <div className="flex items-center gap-1 font-mono font-bold text-slate-800">
-                    <span>{rec.upiId}</span>
-                    <button
-                      onClick={() => handleCopy(rec.upiId)}
-                      className="p-1 hover:text-indigo-600 cursor-pointer"
-                    >
-                      {copiedId === rec.upiId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    </button>
+          filteredRecords.map((rec) => {
+            const isBank = rec.type === 'BANK' || !!rec.bankDetails;
+            return (
+              <div
+                key={rec.id}
+                className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-black text-slate-900 font-mono">
+                      ₹{rec.amount.toFixed(2)}
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
+                      isBank ? 'bg-blue-50 text-blue-800 border border-blue-200' : 'bg-purple-50 text-purple-800 border border-purple-200'
+                    }`}>
+                      {isBank ? <Building2 className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
+                      <span>{isBank ? 'Bank Transfer' : (rec.type || 'UPI')}</span>
+                    </span>
                   </div>
+
+                  <span
+                    className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                      rec.status === 'SUCCESSFUL'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : rec.status === 'REJECTED'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}
+                  >
+                    {rec.status === 'SUCCESSFUL' ? 'SETTLED' : rec.status}
+                  </span>
                 </div>
 
-                <div className="flex justify-between text-slate-500 text-[11px]">
-                  <span>Requested On:</span>
-                  <span>{rec.timestamp}</span>
-                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5 text-xs">
+                  {isBank && rec.bankDetails ? (
+                    <>
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Account Holder:</span>
+                        <span className="font-bold text-slate-900">{rec.bankDetails.accountHolderName}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Bank Name:</span>
+                        <span className="font-bold text-slate-900">{rec.bankDetails.bankName}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Account Number:</span>
+                        <div className="flex items-center gap-1 font-mono font-bold text-slate-800">
+                          <span>{rec.bankDetails.accountNumber}</span>
+                          <button
+                            onClick={() => handleCopy(rec.bankDetails!.accountNumber)}
+                            className="p-1 hover:text-red-600 cursor-pointer"
+                          >
+                            {copiedId === rec.bankDetails.accountNumber ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>IFSC Code:</span>
+                        <span className="font-mono font-bold text-slate-900">{rec.bankDetails.ifscCode}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Beneficiary UPI ID:</span>
+                      <div className="flex items-center gap-1 font-mono font-bold text-slate-800">
+                        <span>{rec.upiId || 'UPI Direct'}</span>
+                        {rec.upiId && (
+                          <button
+                            onClick={() => handleCopy(rec.upiId)}
+                            className="p-1 hover:text-red-600 cursor-pointer"
+                          >
+                            {copiedId === rec.upiId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                {rec.bankReference && (
-                  <div className="flex justify-between text-emerald-700 font-mono text-[11px] pt-1 border-t border-slate-200">
-                    <span>Bank RRN:</span>
-                    <span>{rec.bankReference}</span>
+                  <div className="flex justify-between text-slate-500 text-[11px] pt-1 border-t border-slate-200">
+                    <span>Order Ref:</span>
+                    <span className="font-mono font-bold">{rec.orderNumber || rec.id}</span>
                   </div>
-                )}
+
+                  <div className="flex justify-between text-slate-500 text-[11px]">
+                    <span>Requested On:</span>
+                    <span>{rec.time}</span>
+                  </div>
+
+                  {rec.bankReference && (
+                    <div className="flex justify-between text-emerald-700 font-mono text-[11px] pt-1 border-t border-slate-200">
+                      <span>UTR / Bank RRN:</span>
+                      <span className="font-bold">{rec.bankReference}</span>
+                    </div>
+                  )}
+
+                  {rec.rejectionReason && (
+                    <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-medium">
+                      Reason: {rec.rejectionReason}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

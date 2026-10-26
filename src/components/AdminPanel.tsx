@@ -143,6 +143,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Edit User Modal State
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+
+  // Create New User ID Modal State
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserMobile, setNewUserMobile] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('1234');
+  const [newUserBalance, setNewUserBalance] = useState('0');
+  const [newUserSpeedMs, setNewUserSpeedMs] = useState(systemConfig.sellingSpeedMs || 4500);
+  const [newUserAdsPaid, setNewUserAdsPaid] = useState(false);
+  const [newUserFeePaid, setNewUserFeePaid] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [createdUserCredentials, setCreatedUserCredentials] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    balance: number;
+    speedMs: number;
+  } | null>(null);
   
   // New/Edit Earner Modal State
   const [editingEarner, setEditingEarner] = useState<TopEarner | null>(null);
@@ -249,6 +269,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateUsers(updated);
     await api.updateUser(cleanUser);
     setEditingUser(null);
+  };
+
+  const handleAdminCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserMobile.trim() || !newUserPassword.trim()) {
+      alert('Please fill Name, Mobile Number, and Password');
+      return;
+    }
+
+    const cleanMobile = newUserMobile.trim().replace(/\D/g, '').slice(-10);
+    const finalEmail = newUserEmail.trim() || `${cleanMobile || 'user'}@datasell.in`;
+
+    setIsCreatingUser(true);
+    try {
+      const res = await api.adminCreateUser({
+        name: newUserName.trim(),
+        phone: newUserMobile.trim().startsWith('+91') ? newUserMobile.trim() : `+91 ${newUserMobile.trim()}`,
+        email: finalEmail,
+        password: newUserPassword.trim(),
+        balance: parseFloat(newUserBalance) || 0,
+        customSellingSpeedMs: Number(newUserSpeedMs) || 4500,
+        hasPaidAdsActivation: newUserAdsPaid,
+        hasPaidWithdrawalFee: newUserFeePaid,
+      });
+
+      if (res && res.user) {
+        onUpdateUsers([...users.filter(u => u.id !== res.user.id && u.email.toLowerCase() !== res.user.email.toLowerCase()), res.user]);
+        setCreatedUserCredentials({
+          name: res.user.name,
+          email: res.user.email,
+          phone: res.user.phone,
+          password: newUserPassword.trim(),
+          balance: res.user.balance,
+          speedMs: res.user.customSellingSpeedMs || 4500,
+        });
+        // reset form
+        setNewUserName('');
+        setNewUserMobile('');
+        setNewUserEmail('');
+        setNewUserPassword('1234');
+        setNewUserBalance('0');
+        setIsCreateUserModalOpen(false);
+      } else {
+        alert(res?.error || 'Failed to create user account');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error communicating with server');
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const handleQuickAdjustBalance = async (user: UserAccount, delta: number) => {
@@ -887,8 +957,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 />
               </div>
 
-              {/* Quick Filter Chips */}
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              {/* Quick Filter Chips & Create User Button */}
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateUserModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl font-black bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white shadow-lg shadow-red-900/30 border border-amber-400/40 flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 text-amber-300 stroke-[3]" />
+                  <span>➕ Create New User ID</span>
+                </button>
+
+                <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+
                 <button
                   onClick={() => setUserFilter('all')}
                   className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
@@ -1670,18 +1751,75 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </span>
                       </div>
 
-                      <div>
-                        <span className="text-slate-500 block text-[11px]">Destination UPI ID</span>
-                        <div className="flex items-center gap-1.5 font-mono text-amber-300 font-bold">
-                          <span>{record.upiId}</span>
-                          <button
-                            onClick={() => handleCopy(record.upiId)}
-                            className="text-amber-400 hover:text-white"
-                            title="Copy UPI ID"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </div>
+                      <div className="sm:col-span-2">
+                        {record.type === 'BANK' || record.bankDetails ? (
+                          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                                <CreditCard className="w-3 h-3 text-amber-400" />
+                                <span>Bank Account Transfer</span>
+                              </span>
+                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono text-[9px] font-bold">
+                                {record.bankDetails?.bankName || 'Direct Bank'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                              <div>
+                                <span className="text-slate-500 text-[10px] block">A/C Holder</span>
+                                <span className="text-white font-bold truncate block">{record.bankDetails?.accountHolderName || 'N/A'}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 text-[10px] block">IFSC Code</span>
+                                <div className="flex items-center gap-1 font-mono font-bold text-amber-300">
+                                  <span>{record.bankDetails?.ifscCode || 'N/A'}</span>
+                                  {record.bankDetails?.ifscCode && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopy(record.bankDetails!.ifscCode)}
+                                      className="text-slate-400 hover:text-white"
+                                      title="Copy IFSC"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 text-[10px] block">Account Number</span>
+                              <div className="flex items-center gap-1.5 font-mono text-emerald-400 font-extrabold text-xs">
+                                <span>{record.bankDetails?.accountNumber || 'N/A'}</span>
+                                {record.bankDetails?.accountNumber && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(record.bankDetails!.accountNumber)}
+                                    className="text-amber-400 hover:text-white"
+                                    title="Copy Account Number"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-slate-500 block text-[11px]">Destination UPI ID</span>
+                            <div className="flex items-center gap-1.5 font-mono text-amber-300 font-bold">
+                              <span>{record.upiId || 'N/A'}</span>
+                              {record.upiId && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(record.upiId!)}
+                                  className="text-amber-400 hover:text-white"
+                                  title="Copy UPI ID"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -2470,6 +2608,228 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
+              {/* Per-User Data Selling Speed Control (User Request: admin panel me user edit data selling speed kitna set karna hai wo option add kar dijiye sir) */}
+              <div className="p-3.5 rounded-2xl bg-[#080B12] border border-amber-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-black uppercase tracking-wider text-xs">
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span>User Data Selling Speed (डाटा सेलिंग स्पीड)</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
+                    {editingUser.customSellingSpeedMs ? `${editingUser.customSellingSpeedMs}ms` : 'System Default (4500ms)'}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-400">
+                  Set how fast or slow this specific user sells bandwidth and earns money on their mobile:
+                </p>
+
+                {/* Speed Presets */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser({
+                      ...editingUser,
+                      customSellingSpeedMs: 1000,
+                      customMbPerPacketMin: 0.30,
+                      customMbPerPacketMax: 0.75,
+                    })}
+                    className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                      editingUser.customSellingSpeedMs === 1000
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block text-amber-300">⚡ 1000ms (Ultra Turbo)</span>
+                    <span className="text-[10px] text-slate-500">Superfast packet streams</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser({
+                      ...editingUser,
+                      customSellingSpeedMs: 2000,
+                      customMbPerPacketMin: 0.20,
+                      customMbPerPacketMax: 0.50,
+                    })}
+                    className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                      editingUser.customSellingSpeedMs === 2000
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block text-emerald-300">🚀 2000ms (High Speed)</span>
+                    <span className="text-[10px] text-slate-500">Fast 5G rate flow</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser({
+                      ...editingUser,
+                      customSellingSpeedMs: 4500,
+                      customMbPerPacketMin: 0.15,
+                      customMbPerPacketMax: 0.45,
+                    })}
+                    className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                      editingUser.customSellingSpeedMs === 4500 || !editingUser.customSellingSpeedMs
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block text-blue-300">⏱️ 4500ms (Normal Std)</span>
+                    <span className="text-[10px] text-slate-500">Realistic standard pace</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser({
+                      ...editingUser,
+                      customSellingSpeedMs: 8000,
+                      customMbPerPacketMin: 0.08,
+                      customMbPerPacketMax: 0.20,
+                    })}
+                    className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                      editingUser.customSellingSpeedMs === 8000
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block text-purple-300">🐢 8000ms (Slow / Stable)</span>
+                    <span className="text-[10px] text-slate-500">Gradual streaming</span>
+                  </button>
+                </div>
+
+                {/* Custom Milliseconds Input */}
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800 text-[11px]">
+                  <div>
+                    <label className="text-slate-400 block font-bold mb-1">Custom Speed (ms)</label>
+                    <input
+                      type="number"
+                      min="500"
+                      max="30000"
+                      step="100"
+                      value={editingUser.customSellingSpeedMs || 4500}
+                      onChange={(e) => setEditingUser({
+                        ...editingUser,
+                        customSellingSpeedMs: parseInt(e.target.value, 10) || 4500,
+                      })}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block font-bold mb-1">Min MB/Pkt</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max="10"
+                      value={editingUser.customMbPerPacketMin || 0.15}
+                      onChange={(e) => setEditingUser({
+                        ...editingUser,
+                        customMbPerPacketMin: parseFloat(e.target.value) || 0.15,
+                      })}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block font-bold mb-1">Max MB/Pkt</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.05"
+                      max="20"
+                      value={editingUser.customMbPerPacketMax || 0.45}
+                      onChange={(e) => setEditingUser({
+                        ...editingUser,
+                        customMbPerPacketMax: parseFloat(e.target.value) || 0.45,
+                      })}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Saved Bank Details Section */}
+              <div className="p-3.5 rounded-2xl bg-[#080B12] border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Bank Account Details (बैंक खाता)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">For direct IMPS/NEFT payouts</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-bold">Account Holder Name</label>
+                    <input
+                      type="text"
+                      value={editingUser.savedBankDetails?.accountHolderName || ''}
+                      onChange={(e) => setEditingUser({
+                        ...editingUser,
+                        savedBankDetails: {
+                          ...(editingUser.savedBankDetails || { bankName: '', accountNumber: '', ifscCode: '' }),
+                          accountHolderName: e.target.value,
+                        }
+                      })}
+                      placeholder="e.g. Deepak Kumar"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-bold">Bank Name</label>
+                    <input
+                      type="text"
+                      value={editingUser.savedBankDetails?.bankName || ''}
+                      onChange={(e) => setEditingUser({
+                        ...editingUser,
+                        savedBankDetails: {
+                          ...(editingUser.savedBankDetails || { accountHolderName: '', accountNumber: '', ifscCode: '' }),
+                          bankName: e.target.value,
+                        }
+                      })}
+                      placeholder="e.g. State Bank of India"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-bold">Account Number</label>
+                    <input
+                      type="text"
+                      value={editingUser.savedBankDetails?.accountNumber || ''}
+                      onChange={(e) => setEditingUser({
+                        ...editingUser,
+                        savedBankDetails: {
+                          ...(editingUser.savedBankDetails || { accountHolderName: '', bankName: '', ifscCode: '' }),
+                          accountNumber: e.target.value.replace(/\D/g, ''),
+                        }
+                      })}
+                      placeholder="e.g. 30894729103"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-bold">IFSC Code</label>
+                    <input
+                      type="text"
+                      value={editingUser.savedBankDetails?.ifscCode || ''}
+                      onChange={(e) => setEditingUser({
+                        ...editingUser,
+                        savedBankDetails: {
+                          ...(editingUser.savedBankDetails || { accountHolderName: '', bankName: '', accountNumber: '' }),
+                          ifscCode: e.target.value.toUpperCase(),
+                        }
+                      })}
+                      placeholder="e.g. SBIN0001234"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-slate-400 mb-1 font-bold">Default UPI ID</label>
                 <input
@@ -2496,6 +2856,284 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: CREATE / REGISTER NEW USER ID ==================== */}
+      {isCreateUserModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-lg bg-gradient-to-b from-[#131726] to-[#0A0D15] border border-amber-500/40 text-white rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-red-600 p-[1px]">
+                  <div className="w-full h-full bg-[#0D101A] rounded-xl flex items-center justify-center font-bold text-amber-300 text-sm">
+                    ➕
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                    Register / Create New User ID (नया यूजर आईडी बनाएं)
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    Direct central server registration • Works immediately on any mobile APK
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreateUserModalOpen(false)}
+                className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminCreateUser} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">
+                    Full Name <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">
+                    Mobile Number (10 Digits) <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={newUserMobile}
+                    onChange={(e) => setNewUserMobile(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-amber-300 font-mono font-bold focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">
+                    Email Address <span className="text-slate-500 text-[10px]">(Optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="Optional (auto-generated if empty)"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-white font-mono focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1 font-bold">
+                    Password <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    placeholder="e.g. 1234"
+                    className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-amber-300 font-mono font-bold focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-bold">
+                  Initial Wallet Balance (₹)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={newUserBalance}
+                  onChange={(e) => setNewUserBalance(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-emerald-400 font-mono font-black text-sm"
+                />
+              </div>
+
+              {/* Data Selling Speed Option */}
+              <div className="p-3 rounded-2xl bg-[#080B12] border border-amber-500/25 space-y-2">
+                <label className="text-xs font-black text-amber-400 uppercase tracking-wider block">
+                  ⚡ Data Selling Speed (डाटा सेलिंग स्पीड सेट करें)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewUserSpeedMs(1000)}
+                    className={`p-2 rounded-xl text-left border cursor-pointer ${
+                      newUserSpeedMs === 1000 ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block">⚡ 1000ms Ultra Turbo</span>
+                    <span className="text-[10px] text-slate-500">Superfast earning</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewUserSpeedMs(2000)}
+                    className={`p-2 rounded-xl text-left border cursor-pointer ${
+                      newUserSpeedMs === 2000 ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block">🚀 2000ms Fast 5G</span>
+                    <span className="text-[10px] text-slate-500">Fast streaming</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewUserSpeedMs(4500)}
+                    className={`p-2 rounded-xl text-left border cursor-pointer ${
+                      newUserSpeedMs === 4500 ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block">⏱️ 4500ms Normal</span>
+                    <span className="text-[10px] text-slate-500">Default realistic</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewUserSpeedMs(8000)}
+                    className={`p-2 rounded-xl text-left border cursor-pointer ${
+                      newUserSpeedMs === 8000 ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block">🐢 8000ms Slow</span>
+                    <span className="text-[10px] text-slate-500">Gradual steady</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Feature Unlocks */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between cursor-pointer">
+                  <span className="text-slate-300 font-bold">Ads Monetization (₹199)</span>
+                  <input
+                    type="checkbox"
+                    checked={newUserAdsPaid}
+                    onChange={(e) => setNewUserAdsPaid(e.target.checked)}
+                    className="w-4 h-4 rounded text-red-600"
+                  />
+                </label>
+
+                <label className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between cursor-pointer">
+                  <span className="text-slate-300 font-bold">Withdrawal Fee (₹99)</span>
+                  <input
+                    type="checkbox"
+                    checked={newUserFeePaid}
+                    onChange={(e) => setNewUserFeePaid(e.target.checked)}
+                    className="w-4 h-4 rounded text-red-600"
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateUserModalOpen(false)}
+                  className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingUser}
+                  className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black shadow-lg transition-all border border-amber-400/40 uppercase tracking-wider cursor-pointer disabled:opacity-50"
+                >
+                  {isCreatingUser ? 'Creating On Server...' : '✓ Create & Save User ID'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: COPY NEW CREDENTIALS POPUP ==================== */}
+      {createdUserCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md bg-gradient-to-b from-[#131726] to-[#0A0D15] border border-amber-500/50 text-white rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-red-600 mx-auto flex items-center justify-center text-white text-xl font-black shadow-lg shadow-amber-500/20">
+                ✓
+              </div>
+              <h3 className="text-base font-black text-amber-300 uppercase tracking-wider">
+                User ID Successfully Created!
+              </h3>
+              <p className="text-xs text-slate-300">
+                यह आईडी अब किसी भी मोबाइल APK में तुरंत लॉग इन हो जाएगी:
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#080B12] border border-amber-500/30 space-y-2.5 text-xs font-mono">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                <span className="text-slate-400">User Name:</span>
+                <span className="text-white font-bold">{createdUserCredentials.name}</span>
+              </div>
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                <span className="text-slate-400">Login Mobile:</span>
+                <div className="flex items-center gap-1.5 text-amber-300 font-black">
+                  <span>{createdUserCredentials.phone}</span>
+                  <button
+                    onClick={() => handleCopy(createdUserCredentials.phone.replace(/\D/g, '').slice(-10))}
+                    className="text-amber-400 hover:text-white"
+                    title="Copy 10-digit Phone"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                <span className="text-slate-400">Email:</span>
+                <span className="text-slate-300 truncate max-w-[200px]">{createdUserCredentials.email}</span>
+              </div>
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                <span className="text-slate-400">Password:</span>
+                <div className="flex items-center gap-1.5 text-emerald-400 font-black">
+                  <span>{createdUserCredentials.password}</span>
+                  <button
+                    onClick={() => handleCopy(createdUserCredentials.password)}
+                    className="text-amber-400 hover:text-white"
+                    title="Copy Password"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Selling Speed:</span>
+                <span className="text-amber-300 font-bold">{createdUserCredentials.speedMs}ms</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const shareText = `📱 DataSell User Account Credentials:\nName: ${createdUserCredentials.name}\nMobile/Login: ${createdUserCredentials.phone.replace(/\D/g, '').slice(-10)}\nPassword: ${createdUserCredentials.password}\nBalance: ₹${createdUserCredentials.balance}\nSpeed: ${createdUserCredentials.speedMs}ms\n\nLogin now on the DataSell APK!`;
+                  handleCopy(shareText);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Copy className="w-4 h-4" />
+                <span>{copiedText ? 'Copied to Clipboard! ✓' : '📋 Copy Full Details For WhatsApp / SMS'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCreatedUserCredentials(null)}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
