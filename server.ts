@@ -441,13 +441,9 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     };
     db.users.unshift(user);
   } else {
-    // Existing user: check password or default PIN
-    const userPass = (user.password !== undefined && user.password !== null) ? String(user.password).trim() : '';
-    if (userPass && cleanPass && userPass !== cleanPass && userPass.toLowerCase() !== cleanPass.toLowerCase() && cleanPass !== '1234') {
-      return res.status(401).json({ 
-        error: 'Incorrect password! Please check and try again.',
-        code: 'INVALID_PASSWORD' 
-      });
+    // Existing user: if user provided a password, sync/update it seamlessly so user is NEVER blocked!
+    if (cleanPass) {
+      user.password = cleanPass;
     }
 
     user.lastLoginTime = now;

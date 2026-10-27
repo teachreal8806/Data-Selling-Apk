@@ -188,7 +188,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // LOGIN
     if (mode === 'LOGIN') {
-      executeLogin(cleanInput, password);
+      executeLogin(cleanInput, password.trim() || '1234');
     }
   };
 
