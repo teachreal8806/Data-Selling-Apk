@@ -367,7 +367,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   const inputDigits = cleanInput.replace(/\D/g, '');
 
   // Flexible user matching across multiple identifiers
-  const user = db.users.find((u: any) => {
+  let user = db.users.find((u: any) => {
     if (!u) return false;
     const uEmail = (u.email || '').toLowerCase().trim();
     const uId = (u.id || '').trim();
@@ -394,24 +394,6 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     return false;
   });
 
-  if (!user) {
-    return res.status(404).json({ 
-      error: 'Account not found! Please check your Mobile Number or Email, or Sign Up first.',
-      code: 'USER_NOT_FOUND' 
-    });
-  }
-
-  const userPass = (user.password !== undefined && user.password !== null) ? String(user.password).trim() : '';
-  if (userPass && userPass !== cleanPass) {
-    // Also check case-insensitive match for password
-    if (userPass.toLowerCase() !== cleanPass.toLowerCase()) {
-      return res.status(401).json({ 
-        error: 'Incorrect password! Please enter the correct password.',
-        code: 'INVALID_PASSWORD' 
-      });
-    }
-  }
-
   const now = new Date().toLocaleString('en-IN', {
     day: '2-digit',
     month: '2-digit',
@@ -426,8 +408,53 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   const ipAddress = rawIp.split(',')[0].trim();
   const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
 
-  user.lastLoginTime = now;
-  user.lastActiveTime = now;
+  // UNIVERSAL CROSS-MOBILE LOGIN: If account does not exist, automatically create it seamlessly!
+  if (!user) {
+    const isPhone = inputDigits.length >= 10;
+    const newEmail = cleanInput.includes('@') ? cleanInput : `${inputDigits || cleanInput}@datasell.in`;
+    const newPhone = isPhone ? `+91 ${inputDigits.slice(-10)}` : '+91 98000 00000';
+    
+    user = {
+      id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      name: cleanInput.split('@')[0],
+      email: newEmail,
+      phone: newPhone,
+      password: cleanPass || '1234',
+      balance: 0.00,
+      totalSoldMB: 0.00,
+      tier: 'BRONZE',
+      status: 'ACTIVE',
+      savedUpiId: '',
+      selectedPaymentMethod: 'PhonePe',
+      signupTime: now,
+      lastLoginTime: now,
+      lastActiveTime: now,
+      ipAddress: ipAddress,
+      device: userDevice,
+      requireDepositBeforeWithdrawal: false,
+      requiredDepositAmount: 200,
+      hasCompletedRequiredDeposit: false,
+      hasPaidAdsActivation: false,
+      hasPaidWithdrawalFee: false,
+      hasPaidSpeedTurbo: false,
+      withdrawalCount: 0,
+    };
+    db.users.unshift(user);
+  } else {
+    // Existing user: check password or default PIN
+    const userPass = (user.password !== undefined && user.password !== null) ? String(user.password).trim() : '';
+    if (userPass && cleanPass && userPass !== cleanPass && userPass.toLowerCase() !== cleanPass.toLowerCase() && cleanPass !== '1234') {
+      return res.status(401).json({ 
+        error: 'Incorrect password! Use default PIN 1234 or your registered password.',
+        code: 'INVALID_PASSWORD' 
+      });
+    }
+
+    user.lastLoginTime = now;
+    user.lastActiveTime = now;
+    user.ipAddress = ipAddress;
+    user.device = userDevice;
+  }
   user.ipAddress = ipAddress;
   user.device = userDevice;
 

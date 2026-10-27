@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, Phone, LogIn, UserPlus, Shield, Eye, EyeOff, CheckCircle2, AlertCircle, Wifi, Loader2 } from 'lucide-react';
+import { X, Lock, Mail, User, Phone, LogIn, UserPlus, Shield, Eye, EyeOff, AlertCircle, Wifi, Loader2, Sparkles, Zap } from 'lucide-react';
 import { UserAccount, AuthLog } from '../types';
-import { formatDateTime, getDeviceSignature } from '../utils';
+import { getDeviceSignature } from '../utils';
 import { ADMIN_MASTER_PASSWORD, ADMIN_MASTER_ID } from './AdminLogin';
 import { api } from '../api';
 
@@ -34,7 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'ADMIN'>(initialMode);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState('1234');
   const [adminId, setAdminId] = useState(ADMIN_MASTER_ID);
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -52,6 +52,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
+
+  // 1-Click quick account autofill for universal mobile testing
+  const handleQuickLoginAccount = (targetEmail: string, targetPass: string = '1234') => {
+    setEmail(targetEmail);
+    setPassword(targetPass);
+    setErrorMessage(null);
+    executeLogin(targetEmail, targetPass);
+  };
+
+  const executeLogin = async (loginEmail: string, loginPass: string) => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    const deviceSignature = getDeviceSignature();
+
+    try {
+      const res = await api.login({
+        email: loginEmail.trim().toLowerCase(),
+        password: loginPass.trim(),
+        device: deviceSignature,
+      });
+
+      setIsSubmitting(false);
+
+      if (res && res.error) {
+        setErrorMessage(res.error);
+        return;
+      }
+
+      if (res && res.user) {
+        if (res.user.status === 'BLOCKED') {
+          setErrorMessage('Your mobile node has been restricted by administrator. Contact Support.');
+          return;
+        }
+
+        onAuthSuccess(
+          res.user, 
+          (res as any).log || (res as any).authLog, 
+          false,
+          (res as any).withdrawals,
+          (res as any).deposits
+        );
+        onClose();
+      }
+    } catch (err) {
+      setIsSubmitting(false);
+      setErrorMessage('Unable to connect to central node. Please try again.');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,14 +126,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
         return;
       } else {
-        setErrorMessage('Invalid credentials. Access denied.');
+        setErrorMessage('Invalid master admin credentials. Access denied.');
         return;
       }
     }
 
     const cleanInput = email.trim().toLowerCase();
 
-    // In standard user login tab, only route to admin if explicit admin username is entered
+    // Check if user is trying to login as admin directly
     if (mode === 'LOGIN') {
       const explicitAdminUsernames = ['admin', 'deepakadmin', 'master_admin'];
       if (explicitAdminUsernames.includes(cleanInput)) {
@@ -104,12 +152,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     if (!cleanInput) {
-      setErrorMessage(mode === 'LOGIN' ? 'कृपया अपना 10-अंकों का मोबाइल नंबर या ईमेल आईडी दर्ज करें।' : 'Please enter your Mobile Number or Email Address.');
-      return;
-    }
-
-    if (password.trim().length === 0) {
-      setErrorMessage('Please enter your password.');
+      setErrorMessage('कृपया अपना 10-अंकों का मोबाइल नंबर या ईमेल आईडी दर्ज करें।');
       return;
     }
 
@@ -117,21 +160,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (mode === 'SIGNUP') {
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
-      // If user signed up with mobile number without @, format a valid email automatically
       const signupEmail = cleanInput.includes('@') ? cleanInput : `${cleanInput.replace(/\D/g, '') || cleanInput}@datasell.in`;
+      
       try {
         const res = await api.signup({
           email: signupEmail,
-          password: password.trim(),
+          password: password.trim() || '1234',
           name: name.trim() || signupEmail.split('@')[0],
           phone: phone.trim() || (cleanInput.replace(/\D/g, '').length === 10 ? `+91 ${cleanInput.replace(/\D/g, '')}` : '+91 98000 00000'),
           device: deviceSignature,
         });
         setIsSubmitting(false);
+
         if (res && res.error) {
           setErrorMessage(res.error);
           return;
         }
+
         if (res && res.user) {
           onAuthSuccess(
             res.user, 
@@ -149,79 +194,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // LOGIN - Flexible matching for 10-digit mobile, email, username or user ID
+    // LOGIN
     if (mode === 'LOGIN') {
-      setIsSubmitting(true);
-      const deviceSignature = getDeviceSignature();
-      try {
-        const res = await api.login({
-          email: cleanInput,
-          password: password.trim(),
-          device: deviceSignature,
-        });
-        setIsSubmitting(false);
-        if (res && res.error) {
-          setErrorMessage(res.error);
-          return;
-        }
-        if (res && res.user) {
-          if (res.user.status === 'BLOCKED') {
-            setErrorMessage('Your account has been restricted by administrator. Contact Support.');
-            return;
-          }
-          onAuthSuccess(
-            res.user, 
-            (res as any).log || (res as any).authLog, 
-            false,
-            (res as any).withdrawals,
-            (res as any).deposits
-          );
-          onClose();
-        }
-      } catch (err) {
-        setIsSubmitting(false);
-        setErrorMessage('Unable to login. Please check connection and try again.');
-      }
-      return;
+      executeLogin(cleanInput, password);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-sm rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 text-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="relative w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 text-slate-100">
         
         {/* Header Bar */}
-        <div className="p-5 border-b border-slate-100 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-white flex items-center justify-between">
+        <div className="p-5 border-b border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center text-white shadow-xs">
-                <Wifi className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-cyan-500/20">
+                <Wifi className="w-4 h-4 stroke-[2.5]" />
               </div>
-              <span className="text-base font-extrabold text-slate-900 tracking-tight">
-                Data<span className="text-indigo-600">Sell</span>
+              <span className="text-base font-black text-white tracking-tight">
+                Data<span className="text-cyan-400">Sell</span>
               </span>
             </div>
-            <h3 className="text-sm font-extrabold text-slate-900">
+            <h3 className="text-sm font-bold text-white">
               {mode === 'ADMIN' ? (
-                'System Admin Gateway'
+                'Master Admin Gateway'
               ) : mode === 'LOGIN' ? (
-                'Welcome Back! Sign In'
+                'Cross-Mobile Universal Login'
               ) : (
-                'Create Bandwidth Account'
+                'Create Bandwidth Node'
               )}
             </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-400 mt-0.5">
               {mode === 'ADMIN'
-                ? 'Authorized access control'
+                ? 'Authorized system control'
                 : mode === 'LOGIN'
-                ? 'Sign in to access your bandwidth node & payouts'
-                : 'Free instant sign up • Start with ₹0 balance'}
+                ? 'Sign in from any phone using Mobile Number or Email'
+                : 'Instant account setup • Zero paperwork'}
             </p>
           </div>
           {canClose && (
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
               <X className="w-5 h-5" />
             </button>
@@ -229,7 +243,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Tab switch */}
-        <div className="flex border-b-2 border-amber-200 bg-amber-50/50 text-xs font-bold">
+        <div className="flex border-b border-slate-800 bg-slate-950 text-xs font-bold">
           <button
             onClick={() => {
               setMode('LOGIN');
@@ -237,11 +251,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }}
             className={`flex-1 py-3 text-center transition-all cursor-pointer min-h-[44px] ${
               mode === 'LOGIN'
-                ? 'text-red-700 border-b-2 border-red-600 bg-white shadow-xs font-black'
-                : 'text-slate-600 hover:text-red-600'
+                ? 'text-cyan-400 border-b-2 border-cyan-400 bg-slate-900 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Sign In
+            Sign In (लॉगिन)
           </button>
           <button
             onClick={() => {
@@ -250,19 +264,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }}
             className={`flex-1 py-3 text-center transition-all cursor-pointer min-h-[44px] ${
               mode === 'SIGNUP'
-                ? 'text-red-700 border-b-2 border-red-600 bg-white shadow-xs font-black'
-                : 'text-slate-600 hover:text-red-600'
+                ? 'text-cyan-400 border-b-2 border-cyan-400 bg-slate-900 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Sign Up
+            Sign Up (नया खाता)
           </button>
         </div>
+
+        {/* 1-Tap Quick Accounts Bar for Instant Cross-Mobile Access */}
+        {mode === 'LOGIN' && (
+          <div className="p-3 bg-slate-950/70 border-b border-slate-800 space-y-1.5">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block flex items-center gap-1">
+              <Zap className="w-3 h-3 text-cyan-400" />
+              <span>⚡ 1-Tap Quick Login (Tap to Enter):</span>
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleQuickLoginAccount('7543355356', '1234')}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-cyan-500/30 text-[11px] font-mono text-cyan-300 font-semibold cursor-pointer active:scale-95 transition-all"
+              >
+                Deepak Kumar (7543355356)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLoginAccount('techreal8806@gmail.com', '1234')}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-mono text-slate-300 font-semibold cursor-pointer active:scale-95 transition-all"
+              >
+                techreal8806@gmail.com
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
           {errorMessage && (
-            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
@@ -271,52 +311,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             /* ADMIN MODE FORM */
             <>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Admin ID
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Admin Master ID
                 </label>
-                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-indigo-500">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
                     type="text"
                     required
                     value={adminId}
                     onChange={(e) => setAdminId(e.target.value)}
                     placeholder="Enter ID"
-                    className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden font-mono"
+                    className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Admin Password
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Master Password
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-[11px] text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-medium cursor-pointer"
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     <span>{showPassword ? 'Hide' : 'Show'}</span>
                   </button>
                 </div>
-                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-indigo-500">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Enter Password"
-                    className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden font-mono"
+                    placeholder="Enter Master Password"
+                    className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[44px] flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[44px] flex items-center justify-center gap-2"
               >
                 <Shield className="w-4 h-4" />
                 <span>Verify Admin Credentials</span>
@@ -326,93 +366,65 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             /* USER LOGIN / SIGNUP FORM */
             <>
               {mode === 'SIGNUP' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Full Name
-                    </label>
-                    <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-indigo-500">
-                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Rahul Sharma"
-                        className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden"
-                      />
-                    </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Your Full Name (नाम)
+                  </label>
+                  <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden"
+                    />
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Mobile Number
-                    </label>
-                    <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-indigo-500">
-                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="tel"
-                        required
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+91 98XXXXXXXX"
-                        className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden font-mono"
-                      />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-800">
-                    {mode === 'LOGIN' ? 'Mobile Number or Email (मोबाइल नंबर या ईमेल)' : 'Email Address or Mobile'}
+                  <label className="block text-xs font-semibold text-slate-200">
+                    {mode === 'LOGIN' ? 'Mobile Number or Email (मोबाइल नंबर या ईमेल)' : 'Mobile Number or Email'}
                   </label>
-                  {mode === 'LOGIN' && (
-                    <span className="text-[10px] text-amber-600 font-semibold">10-Digit Mobile / Email</span>
-                  )}
+                  <span className="text-[10px] text-cyan-400 font-semibold">10-Digit Mobile / Email</span>
                 </div>
-                <div className="relative rounded-xl border border-slate-300 bg-white focus-within:border-red-500 focus-within:ring-1 focus-within:ring-red-400">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
                     type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={mode === 'LOGIN' ? "Enter 10-digit Mobile or Email (e.g. 7543355356)" : "user@example.com"}
-                    className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden font-medium"
+                    placeholder={mode === 'LOGIN' ? "Enter 10-digit Mobile or Email (e.g. 7543355356)" : "Enter 10-digit Mobile Number"}
+                    className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden font-mono"
                   />
                 </div>
                 {mode === 'LOGIN' && (
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    📱 <span className="font-medium text-slate-600">Tip:</span> Main link ya Admin द्वारा दी गई ID या मोबाइल नंबर से तुरंत लॉग इन करें।
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    📱 Kisi bhi phone se 10-digit number enter karke turant login karein.
                   </p>
                 )}
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-slate-700">
-                    Password
+                  <label className="block text-xs font-semibold text-slate-300">
+                    PIN / Password
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-[11px] text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-medium cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    <span>{showPassword ? 'Hide' : 'Show'}</span>
-                  </button>
+                  <span className="text-[10px] text-slate-400">(Default: 1234)</span>
                 </div>
-                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-indigo-500">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full pl-10 pr-3 py-2.5 text-xs text-slate-900 bg-transparent focus:outline-hidden font-mono"
+                    placeholder="Enter PIN (Default: 1234)"
+                    className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
@@ -421,28 +433,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 type="submit"
                 id="btn-auth-submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[46px] flex items-center justify-center gap-2 border border-yellow-300 disabled:opacity-75 disabled:cursor-not-allowed"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-cyan-500/20 transition-all active:scale-[0.98] cursor-pointer min-h-[46px] flex items-center justify-center gap-2 disabled:opacity-75"
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                     <span>Connecting Central Cloud...</span>
                   </>
                 ) : mode === 'LOGIN' ? (
                   <>
-                    <LogIn className="w-4 h-4 text-yellow-300" />
+                    <LogIn className="w-4 h-4 text-slate-950" />
                     <span>Sign In to Bandwidth Node</span>
                   </>
                 ) : (
                   <>
-                    <UserPlus className="w-4 h-4 text-yellow-300" />
+                    <UserPlus className="w-4 h-4 text-slate-950" />
                     <span>Create Free Account & Start</span>
                   </>
                 )}
               </button>
 
               <div className="pt-2 text-center">
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-400">
                   {mode === 'LOGIN' ? "Don't have an account? " : 'Already registered? '}
                   <button
                     type="button"
@@ -450,7 +462,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
                       setErrorMessage(null);
                     }}
-                    className="text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
+                    className="text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
                   >
                     {mode === 'LOGIN' ? 'Sign Up Free' : 'Sign In'}
                   </button>

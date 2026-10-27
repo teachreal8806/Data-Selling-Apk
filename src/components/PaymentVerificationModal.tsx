@@ -7,12 +7,8 @@ import {
   Check, 
   AlertCircle, 
   Sparkles, 
-  ArrowRight,
-  ExternalLink,
-  Lock,
-  Wallet,
-  Zap,
-  ArrowLeft,
+  Lock, 
+  Zap, 
   Clock
 } from 'lucide-react';
 import { DepositGatewayConfig } from '../types';
@@ -84,7 +80,7 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = utrNumber.trim();
-    if (!clean || clean.length < 8) {
+    if (!clean || clean.length < 6) {
       setErrorMsg('Kripya valid 12-digit UPI / Bank UTR Reference number daalein.');
       return;
     }
@@ -105,71 +101,70 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
   const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiUrl)}&margin=8`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-gradient-to-b from-white via-amber-50/40 to-white rounded-3xl overflow-hidden shadow-2xl border-2 border-amber-300 flex flex-col relative animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-sm bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col relative animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto text-slate-100">
         
-        {/* Top Fiery Red & Yellow Header */}
-        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white p-4 relative overflow-hidden shrink-0">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-300/25 rounded-full blur-xl pointer-events-none" />
+        {/* Top Header */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white p-4 relative overflow-hidden shrink-0 border-b border-slate-800">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/15 rounded-full blur-xl pointer-events-none" />
           
           <div className="flex items-center justify-between relative z-10">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-xs text-[10px] font-black uppercase tracking-wider text-yellow-200 border border-yellow-300/40">
-              <Sparkles className="w-3 h-3 text-yellow-300" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-cyan-300 border border-cyan-500/30">
+              <Sparkles className="w-3 h-3 text-cyan-400" />
               <span>{badgeLabel}</span>
             </div>
 
-            {/* Cancel / Close button in header */}
             <button
               onClick={handleCancel}
               title="Cancel payment"
-              className="flex items-center gap-1 py-1 px-2.5 rounded-xl bg-black/25 hover:bg-black/40 text-white text-xs font-bold cursor-pointer transition-colors border border-white/20"
+              className="flex items-center gap-1 py-1 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition-colors border border-slate-700"
             >
               <X className="w-3.5 h-3.5" />
               <span>Cancel</span>
             </button>
           </div>
 
-          <h3 className="text-lg font-black text-white mt-2 leading-tight drop-shadow-xs">
+          <h3 className="text-lg font-bold text-white mt-2 leading-tight">
             {title}
           </h3>
-          <p className="text-[11px] text-amber-100 mt-1 leading-snug font-medium">
+          <p className="text-[11px] text-slate-400 mt-1 leading-snug font-medium">
             {description}
           </p>
         </div>
 
-        {/* TOP CANCEL OPTION BAR ABOVE PAYMENT - Directly satisfying user request ("payment karne ke uper cancel ka option add kar dijiye sir") */}
-        <div className="px-4 py-2.5 bg-gradient-to-r from-amber-100/90 to-yellow-100/90 border-b border-amber-300 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs text-amber-950 font-bold">
-            <Lock className="w-3.5 h-3.5 text-red-600 shrink-0" />
-            <span>UPI Instant Payment</span>
+        {/* Top Cancel Bar directly above payment form */}
+        <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
+            <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span>Instant UPI Gateway</span>
           </div>
           <button
             type="button"
             onClick={handleCancel}
             id="btn-top-cancel-payment"
-            className="flex items-center gap-1 py-1 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer border border-yellow-300"
+            className="flex items-center gap-1 py-1 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-bold transition-all active:scale-95 cursor-pointer border border-rose-500/40"
           >
             <X className="w-3.5 h-3.5" />
             <span>Cancel Payment</span>
           </button>
         </div>
 
-        {/* If payment is already PENDING approval from admin, show clear status */}
+        {/* Pending status warning if already submitted */}
         {isPending && (
-          <div className="m-3 p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-400 text-amber-950 text-xs space-y-1.5">
-            <div className="flex items-center gap-2 font-black text-amber-900">
-              <Clock className="w-4 h-4 text-amber-600 animate-spin" />
+          <div className="m-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1.5">
+            <div className="flex items-center gap-2 font-bold text-amber-300">
+              <Clock className="w-4 h-4 animate-spin text-amber-400" />
               <span>Verification In Progress (PENDING)</span>
             </div>
-            <p className="text-[11px] text-amber-900 leading-tight">
-              Aapka UTR ({pendingUtr || 'Submitted'}) admin panel me verify ho raha hai. Admin ke approve karte hi ye feature turant unlock ho jayega.
+            <p className="text-[11px] text-slate-300 leading-tight">
+              Aapka UTR ({pendingUtr || 'Submitted'}) admin panel me verify ho raha hai. Approval ke baad feature unlock ho jayega.
             </p>
             <div className="pt-1 flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-amber-800">Status: Pending Admin Approval</span>
+              <span className="text-[10px] uppercase font-semibold text-amber-400">Status: Pending Admin Approval</span>
               <button
                 type="button"
                 onClick={handleCancel}
-                className="text-[10px] font-black text-red-700 underline cursor-pointer"
+                className="text-[10px] font-bold text-cyan-400 underline cursor-pointer"
               >
                 Close & Check Later
               </button>
@@ -180,42 +175,42 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
         {/* QR Code & Payment Information */}
         <div className="p-4 space-y-3">
           {/* Payable Amount Box */}
-          <div className="flex items-center justify-between bg-amber-500/15 border border-amber-400/50 rounded-2xl p-2.5">
+          <div className="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-2xl p-2.5">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-600 to-amber-500 flex items-center justify-center text-white font-black text-sm shadow-xs border border-yellow-300">
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-sm">
                 ₹
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Payable Amount</span>
-                <span className="text-base font-black text-red-600 font-mono">₹{amount}.00</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Payable Amount</span>
+                <span className="text-base font-bold text-white font-mono">₹{amount}.00</span>
               </div>
             </div>
 
-            <span className="text-[10px] font-black text-amber-900 bg-amber-200/80 px-2.5 py-1 rounded-lg border border-amber-300">
+            <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">
               Admin Verified
             </span>
           </div>
 
           {/* QR Code Display */}
-          <div className="flex flex-col items-center justify-center bg-white p-3 rounded-2xl border-2 border-dashed border-amber-300 shadow-xs">
-            <div className="p-1.5 bg-white rounded-xl shadow-xs border border-slate-100">
+          <div className="flex flex-col items-center justify-center bg-slate-950 p-3 rounded-2xl border border-slate-800 shadow-xs">
+            <div className="p-2 bg-white rounded-xl shadow-xs">
               <img
                 src={qrImage}
                 alt="Payment QR Code"
                 className="w-36 h-36 object-contain"
               />
             </div>
-            <p className="text-[10px] font-bold text-slate-600 mt-1.5 flex items-center gap-1">
-              <QrCode className="w-3 h-3 text-red-500" />
+            <p className="text-[10px] font-semibold text-slate-400 mt-2 flex items-center gap-1">
+              <QrCode className="w-3.5 h-3.5 text-cyan-400" />
               <span>Scan QR using PhonePe, GPay, Paytm</span>
             </p>
           </div>
 
           {/* Payee Official UPI ID */}
-          <div className="bg-slate-100/90 rounded-2xl p-2.5 border border-slate-200 flex items-center justify-between">
+          <div className="bg-slate-950 rounded-2xl p-2.5 border border-slate-800 flex items-center justify-between">
             <div className="truncate pr-2">
-              <span className="text-[9px] uppercase font-bold text-slate-500 block">Official Payee UPI ID</span>
-              <span className="text-xs font-mono font-bold text-slate-900 truncate block">
+              <span className="text-[9px] uppercase font-semibold text-slate-400 block">Official Payee UPI ID</span>
+              <span className="text-xs font-mono font-bold text-cyan-300 truncate block">
                 {payeeUpi}
               </span>
             </div>
@@ -223,12 +218,12 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
             <button
               type="button"
               onClick={() => handleCopy(payeeUpi)}
-              className="py-1 px-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-red-950 font-black text-[11px] shadow-xs active:scale-95 transition-all flex items-center gap-1 cursor-pointer shrink-0 border border-amber-300"
+              className="py-1 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer shrink-0 border border-slate-700"
             >
               {copiedUpi ? (
                 <>
-                  <Check className="w-3 h-3 text-red-950" />
-                  <span>Copied</span>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400">Copied</span>
                 </>
               ) : (
                 <>
@@ -239,85 +234,56 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
             </button>
           </div>
 
-          {/* 1-Tap App Intent Links in Red & Yellow Theme (No blue) */}
-          <div className="grid grid-cols-3 gap-2">
-            <a
-              href={upiUrl}
-              className="py-1.5 px-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[11px] font-extrabold text-amber-900 text-center shadow-2xs active:scale-95 transition-all"
-            >
-              PhonePe
-            </a>
-            <a
-              href={upiUrl}
-              className="py-1.5 px-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-[11px] font-extrabold text-rose-900 text-center shadow-2xs active:scale-95 transition-all"
-            >
-              Google Pay
-            </a>
-            <a
-              href={upiUrl}
-              className="py-1.5 px-2 rounded-xl bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-[11px] font-extrabold text-yellow-950 text-center shadow-2xs active:scale-95 transition-all"
-            >
-              Paytm
-            </a>
-          </div>
-
-          {/* 12-Digit UTR Input and Action Buttons */}
-          <form onSubmit={handleSubmit} className="space-y-2.5 pt-1 border-t border-slate-200">
-            <div>
-              <label className="block text-xs font-black text-slate-900 mb-1 flex items-center justify-between">
-                <span>Enter 12-Digit UTR / Ref Number:</span>
-                <span className="text-[10px] text-red-600 font-bold uppercase">Required</span>
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={24}
-                placeholder="e.g. 428910482910"
-                value={utrNumber}
-                onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
-                className="w-full px-3 py-2.5 rounded-xl bg-white border-2 border-amber-400 text-sm font-mono font-bold text-slate-950 focus:outline-hidden focus:border-red-500 shadow-inner"
-              />
-            </div>
-
+          {/* 12-Digit UTR Submission Form */}
+          <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-slate-800">
             {errorMsg && (
-              <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
-            {/* Action Buttons: Submit UTR + Cancel Payment */}
-            <div className="space-y-2 pt-1">
-              {/* Submit UTR Button */}
-              <button
-                type="submit"
-                id="btn-submit-utr-verify"
-                disabled={isSubmitting}
-                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-lg active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[46px] border border-yellow-300"
-              >
-                <ShieldCheck className="w-4 h-4 text-yellow-300" />
-                <span>
-                  {isSubmitting
-                    ? 'Submitting UTR to Admin...'
-                    : `Submit UTR for Verification (₹${amount})`}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5 text-yellow-300" />
-              </button>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Enter 12-Digit UPI Reference (UTR) Number
+              </label>
+              <input
+                type="text"
+                required
+                value={utrNumber}
+                onChange={(e) => {
+                  setUtrNumber(e.target.value);
+                  setErrorMsg(null);
+                }}
+                placeholder="e.g. 423985729103"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm tracking-wider focus:outline-hidden focus:border-cyan-400"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                UPI app me payment hone ke baad 12-digit UTR copy karke yahan paste karein.
+              </p>
+            </div>
 
-              {/* Bottom Cancel Payment Button */}
+            <div className="pt-1 flex gap-2">
               <button
                 type="button"
-                id="btn-cancel-payment-bottom"
                 onClick={handleCancel}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
+                className="flex-1 py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-all cursor-pointer min-h-[44px]"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Cancel Payment (रद्द करें)</span>
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-2 py-3 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5 disabled:opacity-75"
+              >
+                <Zap className="w-4 h-4" />
+                <span>{isSubmitting ? 'Verifying...' : `Submit UTR (₹${amount})`}</span>
               </button>
             </div>
           </form>
-
         </div>
+
       </div>
     </div>
   );

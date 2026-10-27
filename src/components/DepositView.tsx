@@ -98,263 +98,226 @@ export const DepositView: React.FC<DepositViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4 pb-28 text-slate-800">
+    <div className="w-full max-w-md mx-auto px-4 py-3 space-y-4 pb-28 text-slate-100">
+      
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
           id="btn-deposit-back"
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-red-600 py-1.5 px-3 rounded-xl hover:bg-amber-100/50 transition-all cursor-pointer min-h-[44px]"
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white py-1.5 px-3 rounded-xl hover:bg-slate-800 transition-all cursor-pointer min-h-[44px]"
         >
-          <ArrowLeft className="w-4 h-4 text-red-600" />
+          <ArrowLeft className="w-4 h-4" />
           <span>Dashboard</span>
         </button>
 
-        <div className="flex items-center gap-1.5 text-xs font-bold text-red-950 bg-amber-100 border border-amber-300 px-3 py-1 rounded-full shadow-xs">
-          <QrCode className="w-3.5 h-3.5 text-red-600" />
+        <div className="flex items-center gap-1.5 bg-slate-900 text-cyan-300 px-3 py-1 rounded-full border border-cyan-500/30 text-xs font-bold">
+          <QrCode className="w-3.5 h-3.5 text-cyan-400" />
           <span>Instant UPI Deposit</span>
         </div>
 
-        <button
-          onClick={onGoToWithdraw}
-          className="text-xs font-bold text-red-600 hover:text-red-800 py-1.5 px-2 transition-all cursor-pointer"
-        >
-          Withdrawal ➔
-        </button>
+        <div className="w-8" />
       </div>
 
       {submitted ? (
-        /* Submission Success Confirmation */
-        <div className="bg-white rounded-3xl p-6 border-2 border-amber-300 shadow-xl text-center space-y-4 animate-in zoom-in-95 duration-200">
-          <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-red-600 mx-auto shadow-xs">
-            <CheckCircle2 className="w-9 h-9 text-emerald-600" />
+        /* Success Confirmation Card */
+        <div className="rounded-3xl bg-slate-900 border border-emerald-500/40 p-6 text-center space-y-4 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto">
+            <CheckCircle2 className="w-9 h-9" />
           </div>
-
-          <div className="space-y-1">
-            <h3 className="text-lg font-black text-slate-900">Deposit Submitted!</h3>
-            <p className="text-xs text-slate-600 max-w-xs mx-auto">
-              Your ₹{numAmount.toFixed(2)} deposit with UTR <span className="font-mono font-bold text-red-600">{utrNumber}</span> has been received.
+          <div>
+            <h3 className="text-lg font-bold text-white">Deposit Submitted!</h3>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+              Your ₹{numAmount.toFixed(2)} deposit with UTR <span className="font-mono text-cyan-400 font-bold">{utrNumber}</span> is received. It will be credited within 2-5 minutes after bank ledger verification.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200 text-left text-xs space-y-1.5">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Gateway Status:</span>
-              <span className="text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">VERIFYING UTR</span>
+          <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-left space-y-1.5">
+            <div className="flex justify-between text-slate-400">
+              <span>Amount:</span>
+              <span className="font-mono font-bold text-white">₹{numAmount.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Method:</span>
-              <span className="text-slate-800 font-bold">{method}</span>
+            <div className="flex justify-between text-slate-400">
+              <span>Payment Mode:</span>
+              <span className="font-semibold text-slate-200">{method}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Expected Time:</span>
-              <span className="text-emerald-700 font-bold">1 - 3 Minutes</span>
+            <div className="flex justify-between text-slate-400">
+              <span>Status:</span>
+              <span className="text-amber-400 font-bold">VERIFYING (Pending)</span>
             </div>
           </div>
 
-          <div className="space-y-2 pt-2">
+          <div className="pt-2 flex flex-col gap-2">
             <button
               onClick={onGoToWithdraw}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-bold text-xs shadow-md transition-all cursor-pointer border border-yellow-300"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5"
             >
-              Go to Withdraw Cash
+              <span>Go to Withdrawal Page</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => {
                 setSubmitted(false);
                 setUtrNumber('');
               }}
-              className="w-full py-2.5 px-4 rounded-xl text-slate-600 hover:text-slate-900 text-xs font-semibold cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs hover:bg-slate-700 transition-all cursor-pointer min-h-[44px]"
             >
-              Deposit Another Amount
+              Submit Another Deposit
             </button>
           </div>
         </div>
       ) : (
-        /* Main Deposit Terminal */
-        <div className="space-y-4">
-          {/* Top Cancel Payment Bar ("payment karne ke uper cancel ka option add kar dijiye sir") */}
-          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gradient-to-r from-red-50 to-amber-50 border border-amber-300 shadow-xs">
-            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-red-600" />
-              <span>UPI Deposit Gateway</span>
+        /* Main Deposit Card in Obsidian & Cyan */
+        <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
+          
+          {/* Payee Info Banner */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Verified Merchant</p>
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5 mt-0.5">
+                <span>{depositConfig.payeeName}</span>
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+              AUTO-MATCH ACTIVE
             </span>
+          </div>
+
+          {/* Dynamic QR Code Frame with Neon Corners */}
+          <div className="relative mx-auto w-64 h-64 bg-slate-950 rounded-2xl p-3 border border-cyan-500/30 flex items-center justify-center shadow-lg">
+            {/* Corner Markers */}
+            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-cyan-400 pointer-events-none" />
+            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-cyan-400 pointer-events-none" />
+            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-cyan-400 pointer-events-none" />
+            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-cyan-400 pointer-events-none" />
+
+            <img
+              src={qrUrl}
+              alt="UPI QR Code"
+              className="w-full h-full object-contain rounded-xl bg-white p-2"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          {/* Copy UPI ID Bar */}
+          <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] text-slate-400 font-semibold uppercase">Official UPI ID</p>
+              <p className="text-xs font-mono font-bold text-cyan-300 truncate">{depositConfig.upiId}</p>
+            </div>
             <button
-              type="button"
-              onClick={onBack}
-              id="btn-cancel-deposit-top"
-              className="py-1 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 border border-yellow-300"
+              onClick={handleCopyUpi}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 min-h-[40px] ${
+                copied
+                  ? 'bg-emerald-500 text-slate-950 font-black'
+                  : 'bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700'
+              }`}
             >
-              <span>Cancel Payment</span>
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied!' : 'Copy UPI'}</span>
             </button>
           </div>
 
-          {/* Instructions Notice Banner */}
-          {userState.requireDepositBeforeWithdrawal && !userState.hasCompletedRequiredDeposit && (
-            <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">
-                <span className="font-black text-red-950">Required Verification Deposit:</span> A one-time deposit of ₹{userState.requiredDepositAmount || 200} is required to verify your UPI payment account and activate automated withdrawals.
-              </div>
-            </div>
-          )}
-
-          {/* QR Code Card in Red & Yellow Theme */}
-          <div className="bg-white rounded-3xl p-5 border-2 border-amber-300 shadow-md text-center space-y-3 relative overflow-hidden">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-800">Scan & Pay Any UPI App</span>
-              <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold border border-emerald-300">
-                Auto-Verified 24/7
-              </span>
-            </div>
-
-            {/* QR Scanner Container */}
-            <div className="relative mx-auto w-56 h-56 rounded-2xl bg-white p-3 border-2 border-amber-300 shadow-inner flex items-center justify-center overflow-hidden">
-              <img 
-                src={qrUrl} 
-                alt="UPI Deposit QR Code" 
-                className="w-full h-full object-contain rounded-lg"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-
-            {/* Payee Name & Official UPI ID */}
-            <div className="p-3 rounded-2xl bg-amber-50/50 border border-amber-200 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Payee:</span>
-                <span className="font-bold text-slate-900">{depositConfig.payeeName}</span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-amber-200/80">
-                <span className="text-xs font-mono font-bold text-red-700 truncate">{depositConfig.upiId}</span>
+          {/* Quick Amount Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Select or Enter Amount (₹)
+            </label>
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {[100, 200, 500, 1000].map((val) => (
                 <button
-                  id="btn-copy-upi-id"
-                  onClick={handleCopyUpi}
-                  className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-red-600 to-amber-500 text-white text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all cursor-pointer shadow-xs border border-yellow-300"
+                  key={val}
+                  type="button"
+                  onClick={() => handleQuickAmount(val)}
+                  className={`py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer min-h-[40px] border ${
+                    amount === val.toString()
+                      ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
+                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                  }`}
                 >
-                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  <span>{copied ? 'Copied!' : 'Copy UPI'}</span>
+                  ₹{val}
                 </button>
-              </div>
+              ))}
             </div>
 
-            {/* 1-Tap Launch in Mobile Apps in Red & Yellow Theme (No blue) */}
-            <div className="space-y-1.5 pt-1">
-              <p className="text-[11px] text-slate-500 font-medium">Or pay instantly via your preferred UPI app:</p>
-              <div className="grid grid-cols-4 gap-2">
-                <a
-                  href={upiUri}
-                  onClick={() => setMethod('PhonePe')}
-                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setErrorMsg(null);
+              }}
+              placeholder="Enter custom amount"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm focus:outline-hidden focus:border-cyan-400"
+            />
+          </div>
+
+          {/* UPI App Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Transferring via Application
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['PhonePe', 'GPay', 'Paytm', 'BHIM'] as const).map((app) => (
+                <button
+                  key={app}
+                  type="button"
+                  onClick={() => setMethod(app)}
+                  className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[40px] border ${
+                    method === app
+                      ? 'bg-slate-800 text-cyan-400 border-cyan-500/50 shadow-xs'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                  }`}
                 >
-                  PhonePe
-                </a>
-                <a
-                  href={upiUri}
-                  onClick={() => setMethod('GPay')}
-                  className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-900 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
-                >
-                  GPay
-                </a>
-                <a
-                  href={upiUri}
-                  onClick={() => setMethod('Paytm')}
-                  className="p-2 rounded-xl bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-950 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
-                >
-                  Paytm
-                </a>
-                <a
-                  href={upiUri}
-                  onClick={() => setMethod('BHIM')}
-                  className="p-2 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-900 font-bold text-[11px] text-center active:scale-95 transition-all shadow-xs"
-                >
-                  BHIM
-                </a>
-              </div>
+                  {app}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Deposit Form with Amount & UTR */}
-          <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-5 border-2 border-amber-300 shadow-md space-y-4">
-            <h4 className="text-xs font-black uppercase tracking-wider text-red-950">
-              Submit Payment Reference (UTR)
-            </h4>
-
+          {/* 12-Digit UTR Input Form */}
+          <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-slate-800">
             {errorMsg && (
-              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
-            {/* Quick Amount Chips */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800">Amount to Deposit (₹)</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[99, 199, 500, 1000].map((val) => (
-                  <button
-                    type="button"
-                    key={val}
-                    onClick={() => handleQuickAmount(val)}
-                    className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all cursor-pointer font-mono border ${
-                      amount === val.toString()
-                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white border-yellow-300 shadow-sm font-black'
-                        : 'bg-amber-50 text-slate-800 border-amber-200 hover:bg-amber-100'
-                    }`}
-                  >
-                    ₹{val}
-                  </button>
-                ))}
-              </div>
-              <input
-                type="number"
-                min="50"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter deposit amount"
-                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-amber-300 text-sm font-mono font-bold text-slate-900 bg-white focus:outline-hidden focus:border-red-500"
-              />
-            </div>
-
-            {/* UTR Reference Input */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-800">12-Digit UTR / UPI Reference No.</label>
-                <span className="text-[10px] text-red-600 font-bold uppercase">Required</span>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  12-Digit UPI Reference Number / UTR
+                </label>
+                <span className="text-[10px] text-cyan-400 font-mono">Mandatory</span>
               </div>
               <input
                 type="text"
                 required
-                maxLength={24}
                 value={utrNumber}
                 onChange={(e) => setUtrNumber(e.target.value)}
-                placeholder="e.g. 429182749102"
-                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-amber-300 text-sm font-mono font-bold text-slate-900 bg-white focus:outline-hidden focus:border-red-500"
+                placeholder="e.g. 423985729103"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm tracking-wider focus:outline-hidden focus:border-cyan-400"
               />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Payment successful hone ke baad UPI app se 12-digit UTR copy karke yahan paste karein.
+              </p>
             </div>
 
-            {/* Action Buttons: Submit + Cancel */}
-            <div className="space-y-2 pt-1">
-              <button
-                type="submit"
-                id="btn-submit-deposit-utr"
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-sm shadow-md transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2 border border-yellow-300"
-              >
-                <CheckCircle2 className="w-4 h-4 text-yellow-300" />
-                <span>Verify & Submit UTR (₹{numAmount.toFixed(2)})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onBack}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Cancel & Return to Dashboard
-              </button>
-            </div>
+            <button
+              type="submit"
+              id="btn-submit-deposit-utr"
+              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer min-h-[46px] flex items-center justify-center gap-2"
+            >
+              <Zap className="w-4 h-4" />
+              <span>Submit UTR for Instant Credit (₹{numAmount.toFixed(2)})</span>
+            </button>
           </form>
+
         </div>
       )}
+
     </div>
   );
 };

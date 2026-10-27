@@ -12,13 +12,11 @@ interface WithdrawalHistoryViewProps {
 export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
   records,
   onBack,
-  onApproveRecord,
   currentUserEmail,
 }) => {
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'SUCCESSFUL'>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Filter strictly by the current user's email so new mobile signups never see previous user history
   const userSpecificRecords = currentUserEmail
     ? records.filter((r) => r.userEmail?.toLowerCase() === currentUserEmail.toLowerCase())
     : records;
@@ -35,57 +33,58 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4 pb-28 text-slate-800">
+    <div className="w-full max-w-md mx-auto px-4 py-3 space-y-4 pb-28 text-slate-100">
+      
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
           id="btn-history-back"
-          className="flex items-center gap-1.5 text-xs font-bold text-red-700 hover:text-red-800 py-1.5 px-3 rounded-xl hover:bg-amber-100/60 transition-all cursor-pointer min-h-[44px]"
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white py-1.5 px-3 rounded-xl hover:bg-slate-800 transition-all cursor-pointer min-h-[44px]"
         >
-          <ArrowLeft className="w-4 h-4 text-red-600" />
+          <ArrowLeft className="w-4 h-4" />
           <span>Dashboard</span>
         </button>
 
-        <h2 className="text-sm font-black text-slate-900">
+        <h2 className="text-sm font-bold text-white">
           Payout Statements
         </h2>
 
         <div className="w-16 flex justify-end">
-          <span className="text-[11px] font-mono font-bold text-red-700 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
+          <span className="text-[11px] font-mono font-bold text-cyan-300 bg-slate-900 px-2.5 py-1 rounded-full border border-slate-800">
             {userSpecificRecords.length}
           </span>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex rounded-2xl bg-amber-50/70 p-1 text-xs font-bold border border-amber-200">
+      <div className="flex rounded-2xl bg-slate-950 p-1 text-xs font-semibold border border-slate-800">
         <button
           onClick={() => setFilter('ALL')}
-          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
+          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[40px] ${
             filter === 'ALL'
-              ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white font-black shadow-xs'
-              : 'text-slate-700 hover:text-red-700'
+              ? 'bg-slate-800 text-cyan-300 font-bold border border-cyan-500/30 shadow-xs'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           All ({userSpecificRecords.length})
         </button>
         <button
           onClick={() => setFilter('PENDING')}
-          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
+          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[40px] ${
             filter === 'PENDING'
-              ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
-              : 'text-slate-700 hover:text-red-700'
+              ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 shadow-xs'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           Pending
         </button>
         <button
           onClick={() => setFilter('SUCCESSFUL')}
-          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[44px] ${
+          className={`flex-1 py-2 rounded-xl transition-all cursor-pointer min-h-[40px] ${
             filter === 'SUCCESSFUL'
-              ? 'bg-emerald-600 text-white font-black shadow-xs'
-              : 'text-slate-700 hover:text-red-700'
+              ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           Settled
@@ -95,11 +94,11 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
       {/* Record list */}
       <div className="space-y-3">
         {filteredRecords.length === 0 ? (
-          <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 shadow-xs">
-            <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm font-bold text-slate-800">No Withdrawal Records Found</p>
+          <div className="p-8 text-center bg-slate-900 rounded-3xl border border-slate-800 shadow-xs">
+            <CreditCard className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-300">No Withdrawal Records Found</p>
             <p className="text-xs text-slate-500 mt-1">
-              Your requested payouts and settlement status will show here.
+              Your requested payouts and settlement status will appear here.
             </p>
           </div>
         ) : (
@@ -108,107 +107,76 @@ export const WithdrawalHistoryView: React.FC<WithdrawalHistoryViewProps> = ({
             return (
               <div
                 key={rec.id}
-                className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3"
+                className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-sm space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-black text-slate-900 font-mono">
+                    <span className="text-base font-bold text-white font-mono">
                       ₹{rec.amount.toFixed(2)}
                     </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
-                      isBank ? 'bg-blue-50 text-blue-800 border border-blue-200' : 'bg-purple-50 text-purple-800 border border-purple-200'
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 ${
+                      isBank ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30' : 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30'
                     }`}>
                       {isBank ? <Building2 className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
-                      <span>{isBank ? 'Bank Transfer' : (rec.type || 'UPI')}</span>
+                      <span>{isBank ? 'Bank IMPS' : (rec.type || 'UPI')}</span>
                     </span>
                   </div>
 
                   <span
                     className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
                       rec.status === 'SUCCESSFUL'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                         : rec.status === 'REJECTED'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                        ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                     }`}
                   >
                     {rec.status === 'SUCCESSFUL' ? 'SETTLED' : rec.status}
                   </span>
                 </div>
 
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5 text-xs">
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
                   {isBank && rec.bankDetails ? (
                     <>
-                      <div className="flex justify-between items-center text-slate-600">
-                        <span>Account Holder:</span>
-                        <span className="font-bold text-slate-900">{rec.bankDetails.accountHolderName}</span>
+                      <div className="flex justify-between text-slate-400">
+                        <span>A/C Holder:</span>
+                        <span className="text-white font-semibold">{rec.bankDetails.accountHolderName}</span>
                       </div>
-                      <div className="flex justify-between items-center text-slate-600">
-                        <span>Bank Name:</span>
-                        <span className="font-bold text-slate-900">{rec.bankDetails.bankName}</span>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Bank:</span>
+                        <span className="text-white font-semibold">{rec.bankDetails.bankName}</span>
                       </div>
-                      <div className="flex justify-between items-center text-slate-600">
-                        <span>Account Number:</span>
-                        <div className="flex items-center gap-1 font-mono font-bold text-slate-800">
-                          <span>{rec.bankDetails.accountNumber}</span>
-                          <button
-                            onClick={() => handleCopy(rec.bankDetails!.accountNumber)}
-                            className="p-1 hover:text-red-600 cursor-pointer"
-                          >
-                            {copiedId === rec.bankDetails.accountNumber ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                          </button>
-                        </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Account No:</span>
+                        <span className="font-mono text-cyan-300 font-bold">{rec.bankDetails.accountNumber}</span>
                       </div>
-                      <div className="flex justify-between items-center text-slate-600">
-                        <span>IFSC Code:</span>
-                        <span className="font-mono font-bold text-slate-900">{rec.bankDetails.ifscCode}</span>
+                      <div className="flex justify-between text-slate-400">
+                        <span>IFSC:</span>
+                        <span className="font-mono text-emerald-300 font-bold">{rec.bankDetails.ifscCode}</span>
                       </div>
                     </>
                   ) : (
-                    <div className="flex justify-between items-center text-slate-600">
-                      <span>Beneficiary UPI ID:</span>
-                      <div className="flex items-center gap-1 font-mono font-bold text-slate-800">
-                        <span>{rec.upiId || 'UPI Direct'}</span>
-                        {rec.upiId && (
-                          <button
-                            onClick={() => handleCopy(rec.upiId)}
-                            className="p-1 hover:text-red-600 cursor-pointer"
-                          >
-                            {copiedId === rec.upiId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>UPI ID:</span>
+                      <span className="font-mono text-cyan-300 font-bold">{rec.upiId || 'Direct UPI'}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between text-slate-500 text-[11px] pt-1 border-t border-slate-200">
+                  <div className="flex justify-between text-slate-500 pt-1 border-t border-slate-900 text-[11px]">
                     <span>Order Ref:</span>
-                    <span className="font-mono font-bold">{rec.orderNumber || rec.id}</span>
+                    <span className="font-mono text-slate-400">{rec.orderNumber || rec.id}</span>
                   </div>
-
                   <div className="flex justify-between text-slate-500 text-[11px]">
-                    <span>Requested On:</span>
-                    <span>{rec.time}</span>
+                    <span>Timestamp:</span>
+                    <span className="text-slate-400">{rec.time}</span>
                   </div>
-
-                  {rec.bankReference && (
-                    <div className="flex justify-between text-emerald-700 font-mono text-[11px] pt-1 border-t border-slate-200">
-                      <span>UTR / Bank RRN:</span>
-                      <span className="font-bold">{rec.bankReference}</span>
-                    </div>
-                  )}
-
-                  {rec.rejectionReason && (
-                    <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-medium">
-                      Reason: {rec.rejectionReason}
-                    </div>
-                  )}
                 </div>
               </div>
             );
           })
         )}
       </div>
+
     </div>
   );
 };

@@ -746,9 +746,9 @@ export default function App() {
   // Mandatory Sign Up / Login Screen
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 via-slate-50 to-red-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-300/30 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-amber-300/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
 
         <AuthModal
           isOpen={true}
@@ -759,7 +759,7 @@ export default function App() {
             setCurrentView('admin');
           }}
           existingUsers={users}
-          initialMode="SIGNUP"
+          initialMode="LOGIN"
           isFirstTime={true}
         />
       </div>
@@ -767,41 +767,41 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50/50 via-slate-50 to-red-50/40 flex flex-col items-center justify-start antialiased text-slate-800 relative overflow-x-hidden selection:bg-red-500/20 selection:text-red-900">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-start antialiased text-slate-100 relative overflow-x-hidden selection:bg-cyan-500/20 selection:text-cyan-200">
       
       {/* Toast Notification Alert */}
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-red-600 to-amber-500 text-white px-4 py-2.5 rounded-2xl shadow-xl border border-yellow-300 text-xs font-black flex items-center gap-2 animate-in fade-in slide-in-from-top-3 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-yellow-300 shrink-0" />
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-cyan-400 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Ambient background glows in Red & Gold */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-red-300/20 via-amber-200/20 to-transparent blur-3xl pointer-events-none rounded-full" />
-      <div className="fixed bottom-0 right-10 w-[400px] h-[400px] bg-amber-200/25 blur-3xl pointer-events-none rounded-full" />
+      {/* Ambient background glows in Cyan & Indigo */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-cyan-500/10 via-indigo-600/10 to-transparent blur-3xl pointer-events-none rounded-full" />
+      <div className="fixed bottom-0 right-10 w-[400px] h-[400px] bg-cyan-500/10 blur-3xl pointer-events-none rounded-full" />
 
       {/* Container simulating smartphone app frame - STATUS BAR AND LOWER SUB-BAR REMOVED AS REQUESTED */}
-      <div className="w-full max-w-md min-h-screen sm:min-h-[94vh] sm:my-4 sm:rounded-[36px] bg-white sm:border-2 sm:border-amber-300 sm:shadow-2xl sm:shadow-red-600/10 flex flex-col relative pb-8 overflow-hidden z-10">
+      <div className="w-full max-w-md min-h-screen sm:min-h-[94vh] sm:my-4 sm:rounded-[36px] bg-slate-950 sm:border sm:border-slate-800 sm:shadow-2xl flex flex-col relative pb-8 overflow-hidden z-10">
         
         {/* Global Broadcast Announcement from Admin if active */}
         {systemConfig.broadcastNotice && (
-          <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white px-4 py-2 text-xs font-black flex items-center gap-2 shadow-xs">
-            <Bell className="w-3.5 h-3.5 shrink-0 animate-bounce text-yellow-300" />
+          <div className="bg-gradient-to-r from-cyan-600 via-teal-600 to-indigo-600 text-white px-4 py-2 text-xs font-bold flex items-center gap-2 shadow-xs">
+            <Bell className="w-3.5 h-3.5 shrink-0 animate-bounce text-cyan-200" />
             <span className="truncate">{systemConfig.broadcastNotice}</span>
           </div>
         )}
 
         {/* Suspended Mobile Account Notice */}
         {userState.status === 'BLOCKED' && (
-          <div className="bg-gradient-to-r from-rose-700 to-red-600 text-white px-3.5 py-2 text-xs font-bold flex items-center justify-between border-b border-rose-500 shadow-md">
+          <div className="bg-gradient-to-r from-rose-950 to-rose-900 text-rose-200 px-3.5 py-2 text-xs font-bold flex items-center justify-between border-b border-rose-800 shadow-md">
             <div className="flex items-center gap-1.5 min-w-0">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-yellow-300 animate-pulse" />
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 animate-pulse" />
               <span className="truncate text-[11px]">Account suspended by Admin. Bandwidth sharing disabled.</span>
             </div>
             <button
               onClick={() => setCurrentView('support')}
-              className="px-2 py-0.5 rounded bg-yellow-400 text-slate-900 font-extrabold text-[10px] shrink-0 hover:bg-yellow-300 cursor-pointer"
+              className="px-2 py-0.5 rounded bg-rose-500 text-slate-950 font-bold text-[10px] shrink-0 hover:bg-rose-400 cursor-pointer"
             >
               Support
             </button>

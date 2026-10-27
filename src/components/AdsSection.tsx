@@ -2,14 +2,12 @@ import React from 'react';
 import { 
   Play, 
   Sparkles, 
-  Gift, 
   Zap, 
   Lock, 
   CheckCircle2, 
   ChevronRight, 
-  Flame,
-  ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  Tv
 } from 'lucide-react';
 import { AdItem } from '../types';
 import { SPONSORED_ADS } from './WatchAdsModal';
@@ -40,45 +38,45 @@ export const AdsSection: React.FC<AdsSectionProps> = ({
       {/* Section Header */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-red-500 to-amber-500 flex items-center justify-center text-white shadow-xs">
-            <Flame className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
+          <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-xs">
+            <Tv className="w-3.5 h-3.5" />
           </div>
-          <h2 className="text-xs font-black uppercase tracking-wider text-red-950">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
             Watch & Earn Cash Ads
           </h2>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-300">
+        <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-cyan-300 bg-slate-900 px-2.5 py-0.5 rounded-full border border-slate-800">
           <span>{hasPaidAdsActivation ? `${adsWatchedToday}/${dailyLimit}` : isAdsPending ? '⏳ PENDING' : '₹199 LOCKED'}</span>
-          <span className="text-[10px] text-amber-800">Status</span>
+          <span className="text-[10px] text-slate-500">Status</span>
         </div>
       </div>
 
-      {/* If ₹199 NOT paid: Show Locked Gate as requested ("ye ads vala 199 payment ke bad watch ads chale sir utr number bharne ka option add kar dijiyega sir") */}
+      {/* If ₹199 NOT paid: Show Locked Gate in Cyber Obsidian & Indigo */}
       {!hasPaidAdsActivation ? (
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-amber-500 p-5 text-white shadow-xl shadow-red-600/20 border-2 border-yellow-400">
-          <div className="absolute -top-10 -right-10 w-36 h-36 bg-yellow-300/30 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-36 h-36 bg-red-800/40 rounded-full blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-5 text-white shadow-xl border border-indigo-500/30">
+          <div className="absolute -top-10 -right-10 w-36 h-36 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-36 h-36 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="relative z-10 space-y-3">
             <div className="flex items-start justify-between">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-yellow-200 border border-yellow-300/40 shadow-xs">
-                <Lock className="w-3.5 h-3.5 text-yellow-300" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-[10px] font-bold uppercase tracking-wider text-cyan-300 border border-cyan-500/30 shadow-xs">
+                <Lock className="w-3.5 h-3.5 text-cyan-400" />
                 <span>{isAdsPending ? '⏳ APPROVAL PENDING' : '₹199 ACTIVATION REQUIRED'}</span>
               </div>
 
-              <span className="bg-yellow-400 text-red-950 font-black text-xs px-2.5 py-0.5 rounded-lg font-mono shadow-xs">
-                {isAdsPending ? 'Pending Admin' : '100% Guaranteed'}
+              <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold text-xs px-2.5 py-0.5 rounded-lg font-mono">
+                {isAdsPending ? 'Admin Review' : 'Guaranteed Instant'}
               </span>
             </div>
 
             <div>
-              <h3 className="text-base font-black text-white leading-tight">
+              <h3 className="text-base font-bold text-white leading-tight">
                 {isAdsPending ? '₹199 Verification Submitted' : 'Watch Ads & Earn ₹50-₹100 Daily Cash'}
               </h3>
-              <p className="text-xs text-amber-100 mt-1 font-medium leading-relaxed">
+              <p className="text-xs text-slate-400 mt-1 font-medium leading-relaxed">
                 {isAdsPending
-                  ? `Aapka ₹199 UTR (${adsUtr || 'Submitted'}) admin panel me verify ho raha hai. Admin approval ke baad ads automatically chalne lagenge.`
+                  ? `Aapka ₹199 UTR (${adsUtr || 'Submitted'}) admin panel me verify ho raha hai. Approval ke baad ads chalne lagenge.`
                   : 'Watch ads feature unlock karne ke liye ₹199 ka one-time verification payment karein aur 12-digit UTR submit karein.'}
               </p>
             </div>
@@ -86,67 +84,67 @@ export const AdsSection: React.FC<AdsSectionProps> = ({
             <button
               onClick={onOpenUnlockAds}
               id="btn-unlock-ads-199"
-              className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-lg active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+              className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer border ${
                 isAdsPending
-                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-300'
-                  : 'bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 hover:from-yellow-200 hover:to-amber-300 text-red-950 border-yellow-200'
+                  ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
+                  : 'bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white border-cyan-400/40'
               }`}
             >
-              <Sparkles className="w-4 h-4 text-red-600" />
+              <Sparkles className="w-4 h-4 text-cyan-300" />
               <span>
                 {isAdsPending
                   ? `⏳ Verification Pending (Check / Re-enter UTR)`
                   : 'Unlock Watch Ads Now (Pay ₹199 & Enter UTR)'}
               </span>
-              <ArrowRight className="w-4 h-4 text-red-700" />
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       ) : (
-        /* If ₹199 IS paid: Show Unlocked High-CPM Video Ad Card in Red & Yellow */
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 p-4 text-white shadow-lg shadow-red-600/20 border-2 border-yellow-400">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-yellow-300/25 rounded-full blur-2xl pointer-events-none" />
+        /* If ₹199 IS paid: Show Unlocked High-CPM Video Ad Card in Obsidian & Emerald */
+        <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-emerald-500/40 p-4 text-white shadow-lg">
+          <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
           
           <div className="relative z-10 flex items-start justify-between">
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-yellow-200 border border-yellow-300/30">
-                <CheckCircle2 className="w-3 h-3 text-yellow-300" />
+              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-[10px] font-bold uppercase tracking-wider text-emerald-300 border border-emerald-500/30">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                 <span>UNLOCKED • LIFETIME ACCESS</span>
               </div>
-              <h3 className="text-sm font-black text-white mt-1">
+              <h3 className="text-sm font-bold text-white mt-1">
                 Watch 10-Sec Ad & Earn ₹5.00
               </h3>
-              <p className="text-[11px] text-amber-100 font-medium">
-                Verified sponsor reward credited directly to your UPI wallet.
+              <p className="text-[11px] text-slate-400 font-medium">
+                Sponsor reward credited directly to your wallet balance.
               </p>
             </div>
 
-            <div className="shrink-0 bg-black/20 backdrop-blur-md p-2 rounded-2xl border border-yellow-300/40 text-center">
-              <span className="text-[10px] text-yellow-200 uppercase font-bold block">Reward</span>
-              <span className="text-base font-black text-yellow-300 font-mono">+₹5.00</span>
+            <div className="shrink-0 bg-slate-950 p-2 rounded-2xl border border-slate-800 text-center">
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">Reward</span>
+              <span className="text-base font-bold text-emerald-400 font-mono">+₹5.00</span>
             </div>
           </div>
 
           {/* Action Button */}
-          <div className="relative z-10 mt-3 pt-3 border-t border-white/20 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-[11px] text-yellow-100">
-              <Zap className="w-3.5 h-3.5 text-yellow-300" />
-              <span>Instant balance credit</span>
+          <div className="relative z-10 mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <Zap className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Instant wallet credit</span>
             </div>
 
             <button
               onClick={() => onWatchAd(featuredAd)}
               id="btn-watch-primary-ad"
-              className="py-2 px-4 rounded-xl bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 hover:from-yellow-200 hover:to-amber-300 text-red-950 font-black text-xs shadow-md flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+              className="py-2 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs shadow-md flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
             >
-              <Play className="w-3.5 h-3.5 fill-red-950 text-red-950" />
+              <Play className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
               <span>Watch Video Ad</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Secondary Quick Ad Options Grid in Red & Yellow Theme */}
+      {/* Secondary Quick Ad Options Grid */}
       <div className="grid grid-cols-2 gap-2.5">
         {SPONSORED_ADS.slice(1, 3).map((ad) => (
           <button
@@ -158,40 +156,40 @@ export const AdsSection: React.FC<AdsSectionProps> = ({
                 onWatchAd(ad);
               }
             }}
-            className="text-left bg-gradient-to-br from-white via-amber-50/40 to-white hover:from-amber-50 border border-amber-300 rounded-2xl p-3 shadow-xs active:scale-98 transition-all cursor-pointer flex flex-col justify-between group"
+            className="text-left bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-3 shadow-xs active:scale-98 transition-all cursor-pointer flex flex-col justify-between group"
           >
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[9px] font-black uppercase text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-md">
+                <span className="text-[9px] font-bold uppercase text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-md">
                   {ad.category.split('&')[0]}
                 </span>
-                <span className="text-xs font-mono font-black text-amber-600">
+                <span className="text-xs font-mono font-bold text-emerald-400">
                   +₹{ad.rewardAmount.toFixed(2)}
                 </span>
               </div>
-              <p className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-red-600 transition-colors">
+              <p className="text-xs font-semibold text-slate-200 line-clamp-1 group-hover:text-cyan-400 transition-colors">
                 {ad.title}
               </p>
               <p className="text-[10px] text-slate-500 mt-0.5">
-                {hasPaidAdsActivation ? `${ad.durationSeconds}s quick sponsor ad` : '🔒 ₹199 to unlock'}
+                {hasPaidAdsActivation ? `${ad.durationSeconds}s sponsor ad` : '🔒 ₹199 to unlock'}
               </p>
             </div>
 
-            <div className="mt-2 pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px] font-bold text-red-600">
+            <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-semibold text-cyan-400">
               <span className="flex items-center gap-1">
                 {hasPaidAdsActivation ? (
                   <>
-                    <Play className="w-3 h-3 fill-red-600 text-red-600" />
+                    <Play className="w-3 h-3 fill-cyan-400 text-cyan-400" />
                     <span>Watch</span>
                   </>
                 ) : (
                   <>
-                    <Lock className="w-3 h-3 text-amber-600" />
-                    <span className="text-amber-700">Unlock</span>
+                    <Lock className="w-3 h-3 text-slate-400" />
+                    <span className="text-slate-400">Unlock</span>
                   </>
                 )}
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-amber-600 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>
         ))}

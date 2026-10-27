@@ -10,14 +10,12 @@ import {
   CreditCard, 
   Trophy, 
   QrCode, 
-  AlertCircle, 
   Activity, 
   Wifi, 
   CheckCircle2,
-  Lock,
-  Flame,
   ShieldAlert,
-  Rocket
+  Rocket,
+  Cpu
 } from 'lucide-react';
 import { DataPacket, UserState, TopEarner, AdItem } from '../types';
 import { AdsSection } from './AdsSection';
@@ -58,60 +56,60 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const telecomProviders = ['Jio 5G Plus', 'Airtel 5G Plus', 'Vi GIGAnet', 'Starlink India', 'BSNL Fiber'];
 
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4 pb-28 text-slate-800">
+    <div className="w-full max-w-md mx-auto px-4 py-3 space-y-4 pb-28 text-slate-100">
       
-      {/* 1. Ultra Premium Red & Yellow Master Balance Card */}
+      {/* 1. Cyber Obsidian & Electric Cyan Master Wallet Card */}
       <div 
         id="balance-card"
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-amber-500 p-6 text-white shadow-2xl shadow-red-600/30 transition-all border-2 border-yellow-300"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-6 text-white shadow-2xl border border-slate-700/80 transition-all"
       >
-        {/* Golden & Red Sheen Glow */}
-        <div className="absolute -right-12 -top-12 w-48 h-48 bg-yellow-300/30 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-red-900/40 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-yellow-200/20 via-transparent to-black/20 pointer-events-none" />
+        {/* Ambient Neon Mesh */}
+        <div className="absolute -right-10 -top-10 w-44 h-44 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 w-44 h-44 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none" />
 
-        {/* Card Header: Tier Badge & Network Status */}
-        <div className="relative z-10 flex items-center justify-between mb-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md border border-yellow-200/40 text-[11px] font-black uppercase tracking-wider text-yellow-200 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin" />
-            <span>{userState.tier} VIP ELITE</span>
+        {/* Card Header: Tier Badge & Realtime Node Status */}
+        <div className="relative z-10 flex items-center justify-between mb-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 border border-cyan-500/30 text-[11px] font-bold tracking-wider text-cyan-300 shadow-xs">
+            <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+            <span>{userState.tier} NODE OPERATOR</span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-white/95 bg-black/30 backdrop-blur-md px-3 py-1 rounded-full border border-yellow-300/30">
-            <span className={`w-2.5 h-2.5 rounded-full ${userState.isSelling ? 'bg-yellow-300 animate-ping' : 'bg-slate-300'}`} />
-            <span className="font-bold text-[11px]">
-              {userState.isSelling ? 'Live Streaming' : 'Network Standby'}
+          <div className="flex items-center gap-2 text-xs bg-slate-950/70 backdrop-blur-md px-3 py-1 rounded-full border border-slate-700/80">
+            <span className={`w-2 h-2 rounded-full ${userState.isSelling ? 'bg-cyan-400 animate-ping' : 'bg-slate-500'}`} />
+            <span className="font-semibold text-[11px] text-slate-200">
+              {userState.isSelling ? '5G Transmission Active' : 'Node Ready'}
             </span>
           </div>
         </div>
 
-        {/* Main Wallet Balance in Gold & White */}
+        {/* Main Wallet Balance in High-Contrast Crisp White & Cyan */}
         <div className="relative z-10 text-center py-2">
-          <p className="text-xs uppercase font-extrabold text-yellow-100 tracking-widest mb-1 drop-shadow-xs">
+          <p className="text-[11px] uppercase font-bold text-slate-400 tracking-widest mb-1">
             Available Wallet Balance
           </p>
           <div className="flex items-baseline justify-center gap-1.5">
-            <span className="text-3xl font-extrabold text-yellow-300">₹</span>
-            <span className="text-5xl font-black text-white tracking-tight font-mono tabular-nums drop-shadow-md">
+            <span className="text-3xl font-bold text-cyan-400">₹</span>
+            <span className="text-5xl font-black text-white tracking-tight font-mono tabular-nums">
               {userState.balance.toFixed(2)}
             </span>
           </div>
-          <p className="text-xs text-yellow-100 mt-2 font-bold flex items-center justify-center gap-1.5">
-            <Database className="w-3.5 h-3.5 text-yellow-300" />
+          <div className="mt-2.5 inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700 text-xs text-slate-300">
+            <Database className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span>Total Bandwidth Sold:</span>
-            <span className="text-white font-mono font-black">{userState.totalSoldMB.toFixed(2)} MB</span>
-          </p>
+            <span className="text-white font-mono font-bold">{userState.totalSoldMB.toFixed(2)} MB</span>
+          </div>
         </div>
 
         {/* Quick Action Buttons: Deposit & Withdraw */}
-        <div className="relative z-10 mt-5 pt-4 border-t border-white/25 grid grid-cols-2 gap-3">
+        <div className="relative z-10 mt-5 pt-4 border-t border-slate-800 grid grid-cols-2 gap-3">
           {onOpenDeposit && (
             <button
               id="btn-card-quick-deposit"
               onClick={onOpenDeposit}
-              className="py-2.5 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white border border-yellow-200/50 text-xs font-black flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer shadow-sm min-h-[44px]"
+              className="py-2.5 px-3 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 text-slate-100 border border-slate-600/60 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer shadow-xs min-h-[44px]"
             >
-              <QrCode className="w-4 h-4 text-yellow-300" />
+              <QrCode className="w-4 h-4 text-cyan-400" />
               <span>Deposit (QR)</span>
             </button>
           )}
@@ -119,83 +117,85 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             id="btn-card-quick-withdraw"
             onClick={onOpenWithdraw}
-            className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 hover:from-yellow-200 hover:to-amber-200 text-red-950 text-xs font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-lg min-h-[44px] border border-yellow-200"
+            className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-lg shadow-cyan-500/20 min-h-[44px]"
           >
-            <CreditCard className="w-4 h-4 text-red-900" />
+            <CreditCard className="w-4 h-4 text-slate-950" />
             <span>Withdraw (UPI / Bank)</span>
-            <ArrowRight className="w-3.5 h-3.5 text-red-900" />
+            <ArrowRight className="w-3.5 h-3.5 text-slate-950" />
           </button>
         </div>
 
         {/* Dual Channel Indicator Chips */}
-        <div className="relative z-10 mt-2.5 flex items-center justify-center gap-2 text-[10px] font-black">
+        <div className="relative z-10 mt-3 flex items-center justify-center gap-2 text-[10px] font-semibold text-slate-400">
           <span 
             onClick={onOpenWithdraw}
-            className="px-2 py-0.5 rounded-full bg-black/25 text-yellow-200 border border-yellow-200/30 cursor-pointer hover:bg-black/40 transition-colors"
+            className="px-2.5 py-0.5 rounded-full bg-slate-950/80 text-cyan-300 border border-cyan-500/20 cursor-pointer hover:border-cyan-400/50 transition-colors"
           >
-            ⚡ UPI (PhonePe/GPay)
+            ⚡ UPI Transfer
           </span>
-          <span className="text-yellow-200">•</span>
+          <span className="text-slate-600">/</span>
           <span 
             onClick={onOpenWithdraw}
-            className="px-2 py-0.5 rounded-full bg-black/25 text-yellow-200 border border-yellow-200/30 cursor-pointer hover:bg-black/40 transition-colors"
+            className="px-2.5 py-0.5 rounded-full bg-slate-950/80 text-emerald-300 border border-emerald-500/20 cursor-pointer hover:border-emerald-400/50 transition-colors"
           >
-            🏦 Direct Bank Account (IMPS)
+            🏦 Direct Bank IMPS
           </span>
         </div>
       </div>
 
       {/* ₹99 Withdrawal Verification Notice Banner if not yet verified */}
       {!userState.hasPaidWithdrawalFee && (
-        <div className="bg-gradient-to-r from-amber-500/15 via-red-500/10 to-amber-500/15 border-2 border-amber-400/90 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-amber-950 shadow-xs">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-indigo-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-slate-200 shadow-md">
           <div className="flex items-center gap-2.5">
-            <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
             <div className="text-left">
-              <p className="text-xs font-black text-red-950">₹99 Payout Security Gate</p>
-              <p className="text-[11px] text-amber-900 leading-tight">
-                Bank payout server unlock karne ke liye ₹99 fee transfer karein.
+              <p className="text-xs font-bold text-white">₹99 Payout Security Verification</p>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Unlock instant bank & UPI settlement channel.
               </p>
             </div>
           </div>
 
           <button
             onClick={onOpenWithdrawalFeeModal}
-            className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs whitespace-nowrap shadow-sm cursor-pointer active:scale-95 transition-all"
+            className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-white font-black text-xs whitespace-nowrap shadow-md cursor-pointer active:scale-95 transition-all min-h-[40px]"
           >
             Pay ₹99
           </button>
         </div>
       )}
 
-      {/* 2. Primary Monetization CTA: Red & Yellow Theme (50mb, 500mb, 1gb buttons REMOVED as requested) */}
+      {/* 2. Primary Bandwidth Monetization CTA */}
       <div className="space-y-2">
         <button
           id="btn-toggle-sell"
           onClick={onToggleSelling}
-          className={`w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-3 active:scale-[0.98] cursor-pointer shadow-xl min-h-[54px] border-2 ${
+          className={`w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-3 active:scale-[0.98] cursor-pointer shadow-xl min-h-[54px] border ${
             userState.isSelling
-              ? 'bg-gradient-to-r from-red-700 via-rose-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white shadow-red-700/30 border-red-500'
-              : 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white shadow-red-600/25 border-yellow-300'
+              ? 'bg-gradient-to-r from-rose-900 via-rose-800 to-slate-900 text-white border-rose-600/70 shadow-rose-900/30'
+              : 'bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 border-cyan-400/50 shadow-cyan-500/25'
           }`}
         >
           {userState.isSelling ? (
             <>
-              {/* Equalizer Wave Bars in Golden Yellow */}
+              {/* Equalizer Wave Bars in Cyan */}
               <div className="flex items-center gap-1 h-5">
-                <span className="w-1 bg-yellow-300 rounded-full animate-eq-1" />
-                <span className="w-1 bg-yellow-300 rounded-full animate-eq-2" />
-                <span className="w-1 bg-yellow-300 rounded-full animate-eq-3" />
-                <span className="w-1 bg-yellow-300 rounded-full animate-eq-4" />
+                <span className="w-1 bg-cyan-400 rounded-full animate-eq-1" />
+                <span className="w-1 bg-cyan-400 rounded-full animate-eq-2" />
+                <span className="w-1 bg-cyan-400 rounded-full animate-eq-3" />
+                <span className="w-1 bg-cyan-400 rounded-full animate-eq-4" />
               </div>
-              <Square className="w-4 h-4 fill-white" />
-              <span>Stop Bandwidth Monetization</span>
+              <Square className="w-4 h-4 fill-white text-white" />
+              <span className="text-white">Stop Bandwidth Monetization</span>
             </>
           ) : (
             <>
-              <Play className="w-5 h-5 fill-yellow-300 text-yellow-300" />
+              <Play className="w-5 h-5 fill-slate-950 text-slate-950" />
               <span>Sell 500MB Data</span>
-              <span className="text-yellow-200">➔</span>
-              <span className="px-3 py-1 rounded-xl bg-yellow-300 text-red-950 font-mono font-black shadow-xs">
+              <span className="text-slate-950/70">➔</span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 text-emerald-400 font-mono font-black shadow-xs">
                 Earn ₹500
               </span>
             </>
@@ -203,47 +203,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
 
         {/* Live Streaming State Indicator */}
-        <div className="flex items-center justify-between text-xs px-2 text-slate-500 pt-0.5">
+        <div className="flex items-center justify-between text-xs px-2 text-slate-400 pt-0.5">
           <div className="flex items-center gap-1.5">
-            <span className={`w-2.5 h-2.5 rounded-full ${userState.isSelling ? 'bg-amber-500 animate-ping' : 'bg-slate-400'}`} />
-            <span className="text-[11px] font-bold text-slate-700">
+            <span className={`w-2 h-2 rounded-full ${userState.isSelling ? 'bg-cyan-400 animate-ping' : 'bg-slate-600'}`} />
+            <span className="text-[11px] font-medium text-slate-300">
               {userState.isSelling
                 ? userState.hasPaidSpeedTurbo
-                  ? '⚡ 5G Turbo Super Fast Streaming Active!'
-                  : 'Streaming data packets (Standard Mode)...'
-                : 'Bandwidth Ready • Tap to Monetize'}
+                  ? '⚡ 5G Turbo Superfast Pipeline Active'
+                  : 'Streaming live data packets...'
+                : 'Node Ready • Tap to Monetize'}
             </span>
           </div>
 
-          <span className="text-[10px] font-mono font-extrabold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
+          <span className="text-[11px] font-mono font-bold text-cyan-400 bg-slate-900 border border-slate-700/80 px-2 py-0.5 rounded-md">
             ₹1.00 / MB
           </span>
         </div>
       </div>
 
-      {/* 3. Fast Data Selling 5G Turbo Speed Booster ("data selling speed me selling karne ke liye bhi 99 ka payment ka option add kijiye sir") */}
-      <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-yellow-50 to-red-50 p-3.5 shadow-xs space-y-2">
+      {/* 3. Fast Data Selling 5G Turbo Speed Booster */}
+      <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 p-4 shadow-sm space-y-2.5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-red-600 to-amber-500 flex items-center justify-center text-white shadow-xs">
-              <Rocket className="w-4 h-4 text-yellow-300" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-xs">
+              <Rocket className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-xs font-black text-red-950">5G Turbo Speed Mode (10x Fast)</h3>
-              <p className="text-[10px] text-amber-900">High-speed data packet transfer booster</p>
+              <h3 className="text-xs font-bold text-white">5G Turbo Speed Mode (10x Fast)</h3>
+              <p className="text-[11px] text-slate-400">High-speed bandwidth packet stream</p>
             </div>
           </div>
 
           {userState.hasPaidSpeedTurbo ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] font-black uppercase shadow-xs">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               <span>ACTIVE</span>
             </span>
           ) : userState.speedTurboPending ? (
             <button
               onClick={onOpenSpeedTurboModal}
               id="btn-activate-turbo-speed"
-              className="py-1.5 px-3 rounded-xl bg-amber-100 border border-amber-400 text-amber-900 font-black text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1 cursor-pointer animate-pulse"
+              className="py-1.5 px-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1 cursor-pointer animate-pulse"
             >
               <span>⏳ Pending</span>
             </button>
@@ -251,32 +251,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               onClick={onOpenSpeedTurboModal}
               id="btn-activate-turbo-speed"
-              className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs shadow-md active:scale-95 transition-all flex items-center gap-1 cursor-pointer border border-yellow-300"
+              className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs shadow-md active:scale-95 transition-all flex items-center gap-1 cursor-pointer min-h-[40px]"
             >
-              <Zap className="w-3.5 h-3.5 text-yellow-300" />
+              <Zap className="w-3.5 h-3.5" />
               <span>Unlock ₹99</span>
             </button>
           )}
         </div>
 
         {userState.hasPaidSpeedTurbo ? (
-          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-400/40 text-[11px] font-bold text-emerald-900 flex items-center justify-between">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-medium text-emerald-300 flex items-center justify-between">
             <span>⚡ 5G Turbo Pipeline: 800ms Stream • 2.5MB / Packet</span>
-            <span className="font-mono text-[10px] text-emerald-700">10X BOOST</span>
+            <span className="font-mono text-[10px] text-emerald-400 font-bold">10X BOOST</span>
           </div>
         ) : userState.speedTurboPending ? (
-          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-400/40 text-[11px] font-bold text-amber-900 flex items-center justify-between">
-            <span>⏳ 5G Turbo Verification UTR Submitted • Admin approval pending</span>
-            <span className="font-mono text-[10px] text-amber-800">PENDING</span>
+          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] font-medium text-amber-300 flex items-center justify-between">
+            <span>⏳ UTR Submitted • Admin approval in progress</span>
+            <span className="font-mono text-[10px] text-amber-400 font-bold">PENDING</span>
           </div>
         ) : (
-          <p className="text-[11px] text-slate-600 leading-tight">
-            Data selling ko super-fast speed me bechne aur turant earnings stream karne ke liye <strong className="text-red-700 font-bold">₹99 Turbo Speed</strong> payment karein.
+          <p className="text-[11px] text-slate-400 leading-tight">
+            Data selling speed ko 10x super-fast karne ke liye <strong className="text-cyan-400 font-semibold">₹99 Turbo Speed</strong> activate karein.
           </p>
         )}
       </div>
 
-      {/* 4. Sponsored Ads & Rewarded Video Zone (Requires ₹199 Payment to unlock) */}
+      {/* 4. Sponsored Ads & Rewarded Video Zone */}
       <AdsSection 
         onWatchAd={onWatchAd} 
         adsWatchedToday={adsWatchedToday} 
@@ -287,53 +287,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onOpenUnlockAds={onOpenUnlockAds}
       />
 
-      {/* 5. Live Telemetry 2-Column Bento Grid in Red & Yellow Theme */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="bg-gradient-to-br from-white via-amber-50/40 to-white rounded-2xl p-3.5 space-y-1 border border-amber-300 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-amber-900">Network Rate</span>
-            <TrendingUp className="w-3.5 h-3.5 text-red-600" />
+      {/* 5. Live Telemetry 2-Column Bento Grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-900/90 rounded-2xl p-3.5 space-y-1.5 border border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] uppercase font-bold tracking-wider">Network Rate</span>
+            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
           </div>
-          <p className="text-base font-black text-red-600 font-mono">
-            ₹1.00 <span className="text-xs text-slate-500 font-normal">/ MB</span>
+          <p className="text-base font-bold text-white font-mono">
+            ₹1.00 <span className="text-xs text-slate-400 font-normal">/ MB</span>
           </p>
-          <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            Guaranteed credit
+          <p className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+            Instant wallet credit
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-white via-amber-50/40 to-white rounded-2xl p-3.5 space-y-1 border border-amber-300 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-amber-900">Node Latency</span>
-            <Activity className="w-3.5 h-3.5 text-amber-600" />
+        <div className="bg-slate-900/90 rounded-2xl p-3.5 space-y-1.5 border border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] uppercase font-bold tracking-wider">Node Latency</span>
+            <Activity className="w-3.5 h-3.5 text-indigo-400" />
           </div>
-          <p className="text-base font-black text-slate-900 font-mono">
-            {userState.hasPaidSpeedTurbo ? '4 ms' : '12 ms'} <span className="text-xs text-emerald-600 font-bold">Ultra Low</span>
+          <p className="text-base font-bold text-white font-mono">
+            {userState.hasPaidSpeedTurbo ? '4 ms' : '12 ms'} <span className="text-xs text-cyan-400 font-normal">5G Route</span>
           </p>
-          <p className="text-[10px] text-slate-500 font-medium">Global 5G Route</p>
+          <p className="text-[10px] text-slate-400 font-medium">Telecom Mesh Verified</p>
         </div>
       </div>
 
-      {/* 6. Top 1 to 10 High Earners Showcase Card in Gold & Red Podium */}
-      <div className="rounded-3xl bg-gradient-to-br from-amber-100/70 via-white to-amber-50 border-2 border-amber-400/80 p-4 shadow-sm space-y-3">
+      {/* 6. Top 10 High Earners Showcase Card */}
+      <div className="rounded-3xl bg-slate-900/95 border border-slate-800 p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-600 to-amber-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-              <Trophy className="w-4 h-4 fill-yellow-300 text-yellow-300" />
+            <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold text-xs shadow-xs">
+              <Trophy className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-xs font-black text-red-950 tracking-tight">Top 1 to 10 High Earners</h3>
-              <p className="text-[10px] text-amber-900">Verified automated payouts</p>
+              <h3 className="text-xs font-bold text-white">Top 1 to 10 High Earners</h3>
+              <p className="text-[11px] text-slate-400">Verified automated payouts</p>
             </div>
           </div>
 
           <button
             onClick={onOpenLeaderboard}
             id="btn-view-all-top-10"
-            className="text-xs font-black text-red-950 hover:text-red-900 flex items-center gap-1 bg-amber-200/80 hover:bg-amber-300 border border-amber-400 py-1.5 px-3 rounded-xl transition-all cursor-pointer min-h-[44px]"
+            className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 py-1.5 px-3 rounded-xl transition-all cursor-pointer min-h-[44px]"
           >
-            <span>View All Top 10</span>
+            <span>View All</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
@@ -344,14 +344,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {topThree.map((earner) => (
               <div 
                 key={earner.id}
-                className="bg-white rounded-2xl p-2.5 border-2 border-amber-300/80 text-center shadow-xs hover:border-amber-500 transition-all"
+                className="bg-slate-950/80 rounded-2xl p-2.5 border border-slate-800 text-center hover:border-slate-700 transition-all"
               >
-                <div className="text-base">
+                <div className="text-sm">
                   {earner.rank === 1 ? '🥇' : earner.rank === 2 ? '🥈' : '🥉'}
                 </div>
-                <p className="text-xs font-bold text-slate-800 truncate mt-1">{earner.name.split(' ')[0]}</p>
-                <p className="text-xs font-black text-red-600 font-mono">₹{earner.totalEarned.toLocaleString()}</p>
-                <span className="text-[9px] text-amber-800 font-bold block font-mono mt-0.5">{earner.mbSold}MB</span>
+                <p className="text-xs font-semibold text-slate-200 truncate mt-1">{earner.name.split(' ')[0]}</p>
+                <p className="text-xs font-bold text-cyan-400 font-mono">₹{earner.totalEarned.toLocaleString()}</p>
+                <span className="text-[10px] text-slate-400 block font-mono mt-0.5">{earner.mbSold}MB</span>
               </div>
             ))}
           </div>
@@ -362,20 +362,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="space-y-2.5 pt-1">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-red-600" />
-            <h2 className="text-sm font-bold text-red-950 tracking-tight">Recent Data Payouts</h2>
+            <Activity className="w-4 h-4 text-cyan-400" />
+            <h2 className="text-sm font-bold text-white">Recent Data Packets</h2>
           </div>
-          <span className="text-xs text-amber-900 font-mono font-bold">
+          <span className="text-xs text-slate-400 font-mono">
             {packets.length} packets
           </span>
         </div>
 
         {packets.length === 0 ? (
-          <div className="p-8 text-center bg-white rounded-3xl border border-amber-200 shadow-xs">
-            <Database className="w-10 h-10 text-amber-300 mx-auto mb-2" />
-            <p className="text-sm font-bold text-slate-800">No Data Transferred Yet</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-              Tap <span className="font-semibold text-red-600">"Sell 500MB Data ➔ Earn ₹500"</span> above to stream packets and earn instant cash!
+          <div className="p-8 text-center bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xs">
+            <Database className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-200">No Data Transferred Yet</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+              Tap <span className="font-semibold text-cyan-400">"Sell 500MB Data ➔ Earn ₹500"</span> above to stream packets and earn instant cash!
             </p>
           </div>
         ) : (
@@ -386,31 +386,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                 <div
                   key={packet.id}
-                  className="flex items-center justify-between p-3 bg-white border border-amber-200/90 rounded-2xl shadow-xs hover:border-amber-400 transition-all animate-in fade-in slide-in-from-top-2 duration-200"
+                  className="flex items-center justify-between p-3 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xs hover:border-slate-700 transition-all animate-in fade-in slide-in-from-top-2 duration-200"
                 >
                   {/* Left: Provider Icon + Name */}
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
                       <Wifi className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">{provider}</p>
-                      <span className="text-[10px] text-slate-400 font-mono">{packet.time}</span>
+                      <p className="text-xs font-semibold text-slate-200">{provider}</p>
+                      <span className="text-[10px] text-slate-500 font-mono">{packet.time}</span>
                     </div>
                   </div>
 
                   {/* Middle: MB */}
-                  <div className="text-center font-mono text-xs font-bold text-slate-600">
+                  <div className="text-center font-mono text-xs font-semibold text-slate-300">
                     <span>{packet.mb.toFixed(2)} MB</span>
                   </div>
 
                   {/* Right: Rupee Amount */}
                   <div className="text-right">
-                    <span className="text-xs font-black text-red-600 font-mono flex items-center justify-end gap-0.5">
+                    <span className="text-xs font-bold text-emerald-400 font-mono flex items-center justify-end gap-0.5">
                       <span>+₹</span>
                       <span>{packet.amount.toFixed(2)}</span>
                     </span>
-                    <span className="text-[9px] text-emerald-700 block uppercase font-extrabold">Credited</span>
+                    <span className="text-[9px] text-cyan-300 block uppercase font-semibold">Credited</span>
                   </div>
                 </div>
               );

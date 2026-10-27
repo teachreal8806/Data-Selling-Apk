@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw, Trophy, User, Wifi, Flame } from 'lucide-react';
+import { Menu, Trophy, User, Wifi, Cpu } from 'lucide-react';
 
 interface HeaderProps {
   onOpenMenu: () => void;
@@ -14,80 +14,68 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ 
   onOpenMenu, 
   isSelling, 
-  onReset,
-  onOpenLeaderboard,
+  onOpenLeaderboard, 
   onOpenAuth,
   userEmail,
 }) => {
   const avatarLetter = userEmail ? userEmail.charAt(0).toUpperCase() : 'U';
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between bg-white/95 backdrop-blur-md px-3.5 sm:px-4 py-3 border-b-2 border-amber-300 shadow-xs">
+    <header className="sticky top-0 z-30 flex items-center justify-between bg-slate-950/90 backdrop-blur-xl px-4 py-3 border-b border-slate-800/90 shadow-md">
       {/* Left: Menu Toggle + Brand */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-3">
         <button
           id="btn-open-sidebar"
           onClick={onOpenMenu}
           aria-label="Open navigation menu"
-          className="p-2 rounded-xl text-slate-700 hover:text-red-600 hover:bg-amber-100/60 active:scale-95 transition-all border border-amber-300 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 active:scale-95 transition-all border border-slate-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
         >
-          <Menu className="w-5 h-5 text-red-600" />
+          <Menu className="w-5 h-5 text-cyan-400" />
         </button>
 
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 via-rose-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-red-500/25 border border-yellow-300">
-            <Flame className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-slate-950 shadow-md shadow-cyan-500/20 border border-cyan-400/40 font-bold">
+            <Wifi className="w-4 h-4 text-slate-950 stroke-[2.5]" />
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-base font-black text-slate-900 tracking-tight">
-                Data<span className="text-red-600">Sell</span>
+              <span className="text-base font-black text-white tracking-tight">
+                Data<span className="text-cyan-400">Sell</span>
               </span>
               {isSelling && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-red-700 border border-amber-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
                   LIVE
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-amber-800 font-bold">5G Ultra Network</span>
+            <span className="text-[10px] text-slate-400 font-semibold">5G Telecom Node</span>
           </div>
         </div>
       </div>
 
       {/* Right: Quick Actions */}
-      <div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex items-center gap-2">
         {/* Top 10 High Earners button */}
         <button
           id="btn-header-leaderboard"
           onClick={onOpenLeaderboard}
-          title="Top 1 to 10 High Earners"
-          className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-100 to-yellow-100 hover:from-amber-200 hover:to-yellow-200 text-red-950 border border-amber-400 text-xs font-black transition-all active:scale-95 cursor-pointer shadow-xs min-h-[44px]"
+          aria-label="View top earners"
+          className="p-2 rounded-xl text-amber-400 hover:text-amber-300 hover:bg-slate-800 active:scale-95 transition-all border border-slate-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
         >
-          <Trophy className="w-3.5 h-3.5 text-red-600 fill-yellow-400 shrink-0" />
-          <span className="text-[11px] font-black tracking-tight">Top 10</span>
+          <Trophy className="w-4 h-4 fill-amber-400/20" />
         </button>
 
-        {/* User Account / Profile */}
+        {/* User Account / Profile icon */}
         <button
-          id="btn-header-auth"
+          id="btn-header-account"
           onClick={onOpenAuth}
-          title="User Account & Security"
-          className="w-10 h-10 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-slate-700 transition-all flex items-center justify-center font-bold text-xs active:scale-95 cursor-pointer min-h-[44px] min-w-[44px] shadow-xs"
+          aria-label="Open operator account"
+          className="p-1 rounded-xl hover:bg-slate-800 active:scale-95 transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
-          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-600 to-amber-500 flex items-center justify-center text-yellow-200 text-xs font-black shadow-xs border border-yellow-300/40">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-600 text-cyan-300 font-bold text-xs flex items-center justify-center shadow-xs">
             {avatarLetter}
-          </span>
-        </button>
-
-        {/* Quick Reset to 0 start */}
-        <button
-          id="btn-quick-reset"
-          onClick={onReset}
-          title="Reset to 0"
-          className="p-2 rounded-xl text-slate-500 hover:text-red-600 hover:bg-amber-100/50 border border-amber-200 transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shadow-xs"
-        >
-          <RefreshCw className="w-4 h-4" />
+          </div>
         </button>
       </div>
     </header>
