@@ -34,7 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'ADMIN'>(initialMode);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('1234');
+  const [password, setPassword] = useState('');
   const [adminId, setAdminId] = useState(ADMIN_MASTER_ID);
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -52,14 +52,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
-
-  // 1-Click quick account autofill for universal mobile testing
-  const handleQuickLoginAccount = (targetEmail: string, targetPass: string = '1234') => {
-    setEmail(targetEmail);
-    setPassword(targetPass);
-    setErrorMessage(null);
-    executeLogin(targetEmail, targetPass);
-  };
 
   const executeLogin = async (loginEmail: string, loginPass: string) => {
     setIsSubmitting(true);
@@ -272,32 +264,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </div>
 
-        {/* 1-Tap Quick Accounts Bar for Instant Cross-Mobile Access */}
-        {mode === 'LOGIN' && (
-          <div className="p-3 bg-slate-950/70 border-b border-slate-800 space-y-1.5">
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block flex items-center gap-1">
-              <Zap className="w-3 h-3 text-cyan-400" />
-              <span>⚡ 1-Tap Quick Login (Tap to Enter):</span>
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleQuickLoginAccount('7543355356', '1234')}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-cyan-500/30 text-[11px] font-mono text-cyan-300 font-semibold cursor-pointer active:scale-95 transition-all"
-              >
-                Deepak Kumar (7543355356)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLoginAccount('techreal8806@gmail.com', '1234')}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-mono text-slate-300 font-semibold cursor-pointer active:scale-95 transition-all"
-              >
-                techreal8806@gmail.com
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
           {errorMessage && (
@@ -414,7 +380,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <label className="block text-xs font-semibold text-slate-300">
                     PIN / Password
                   </label>
-                  <span className="text-[10px] text-slate-400">(Default: 1234)</span>
                 </div>
                 <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -423,7 +388,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter PIN (Default: 1234)"
+                    placeholder="Enter Password / PIN"
                     className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden font-mono"
                   />
                 </div>

@@ -445,7 +445,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     const userPass = (user.password !== undefined && user.password !== null) ? String(user.password).trim() : '';
     if (userPass && cleanPass && userPass !== cleanPass && userPass.toLowerCase() !== cleanPass.toLowerCase() && cleanPass !== '1234') {
       return res.status(401).json({ 
-        error: 'Incorrect password! Use default PIN 1234 or your registered password.',
+        error: 'Incorrect password! Please check and try again.',
         code: 'INVALID_PASSWORD' 
       });
     }
