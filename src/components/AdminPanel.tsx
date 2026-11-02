@@ -39,7 +39,8 @@ import {
   CheckCircle,
   HelpCircle,
   Shield,
-  Filter
+  Filter,
+  KeyRound
 } from 'lucide-react';
 import { 
   UserAccount, 
@@ -80,7 +81,7 @@ interface AdminPanelProps {
   onUpdateSystemConfig?: (config: SystemConfig) => void;
 }
 
-type AdminTab = 'users' | 'deposits' | 'withdrawals' | 'leaderboard' | 'logs' | 'support' | 'settings';
+type AdminTab = 'users' | 'deposits' | 'withdrawals' | 'codes' | 'leaderboard' | 'logs' | 'support' | 'settings';
 
 const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   sellingSpeedMs: 4500, // Slow, realistic bandwidth streaming as requested
@@ -243,10 +244,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsAdminAuthenticated(false);
   };
 
+  // Verification Codes Tab States
+  const [codeSearchQuery, setCodeSearchQuery] = useState('');
+  const [customCodeInputs, setCustomCodeInputs] = useState<Record<string, string>>({});
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(text);
     setTimeout(() => setCopiedText(null), 2000);
+  };
+
+  const handleRegenerateCode = async (user: UserAccount) => {
+    const randomCode = 'DS-' + Math.floor(100000 + Math.random() * 900000);
+    const updatedUser = { ...user, verificationCode: randomCode };
+    onUpdateUsers(users.map(u => u.id === user.id ? updatedUser : u));
+    await api.setVerificationCode({
+      userId: user.id,
+      userEmail: user.email,
+      verificationCode: randomCode,
+    });
+    setCopiedText(`Copied: ${randomCode}`);
+    navigator.clipboard.writeText(randomCode);
+    setTimeout(() => setCopiedText(null), 2500);
+  };
+
+  const handleCustomCodeSave = async (user: UserAccount) => {
+    const custom = (customCodeInputs[user.id] || '').trim().toUpperCase();
+    if (!custom) return;
+    const updatedUser = { ...user, verificationCode: custom };
+    onUpdateUsers(users.map(u => u.id === user.id ? updatedUser : u));
+    await api.setVerificationCode({
+      userId: user.id,
+      userEmail: user.email,
+      verificationCode: custom,
+    });
+    setCopiedText(`Code Saved: ${custom}`);
+    setTimeout(() => setCopiedText(null), 2500);
+  };
+
+  const handleGenerateAllCodes = async () => {
+    if (!window.confirm('Generate fresh unique verification codes for all user IDs?')) return;
+    setIsGeneratingAll(true);
+    try {
+      const res = await api.generateAllCodes();
+      if (res?.users) {
+        onUpdateUsers(res.users);
+        setCopiedText('All codes updated!');
+        setTimeout(() => setCopiedText(null), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGeneratingAll(false);
+    }
   };
 
   // User Management Handlers
@@ -868,6 +919,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('codes')}
+            className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'codes'
+                ? 'bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 text-amber-300 border border-amber-400/50 shadow-md shadow-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+            <span>Codes Manager (सत्यापन कोड)</span>
+            <span className="px-1.5 py-0.2 rounded-md bg-amber-500/20 text-[10px] font-mono text-amber-300 border border-amber-500/30">
+              {users.filter(u => !!u.verificationCode).length}/{users.length}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('withdrawals')}
             className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'withdrawals'
@@ -1071,6 +1137,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     onClick={() => handleCopy(user.savedUpiId)}
                                     title="Copy UPI"
                                     className="text-slate-500 hover:text-white"
+                                  >
+                                    <Copy className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              )}
+                              {user.verificationCode && (
+                                <div className="text-amber-300 font-mono text-[10px] flex items-center gap-1 mt-0.5 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded w-fit">
+                                  <KeyRound className="w-2.5 h-2.5 text-amber-400" />
+                                  <span>Code: <strong className="text-white">{user.verificationCode}</strong></span>
+                                  <button
+                                    onClick={() => handleCopy(user.verificationCode!)}
+                                    title="Copy Verification Code"
+                                    className="text-amber-400 hover:text-white"
                                   >
                                     <Copy className="w-2.5 h-2.5" />
                                   </button>
@@ -1562,6 +1641,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     onClick={() => handleCopy(dep.utrNumber!)}
                                     title="Copy UTR Number"
                                     className="text-amber-400 hover:text-white"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                              {dep.verificationCode && (
+                                <div className="flex items-center gap-1.5 font-mono text-cyan-300 font-black bg-cyan-500/15 border border-cyan-500/40 px-2.5 py-0.5 rounded-lg">
+                                  <KeyRound className="w-3 h-3 text-cyan-400" />
+                                  <span>Code: {dep.verificationCode}</span>
+                                  <button
+                                    onClick={() => handleCopy(dep.verificationCode!)}
+                                    title="Copy Code"
+                                    className="text-cyan-400 hover:text-white"
                                   >
                                     <Copy className="w-3 h-3" />
                                   </button>
@@ -2335,6 +2427,263 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </form>
           </div>
         )}
+
+        {/* ==================== TAB: VERIFICATION CODES MANAGER (सत्यापन कोड) ==================== */}
+        {activeTab === 'codes' && (
+          <div className="space-y-4">
+            {/* Header & Master Controls Strip */}
+            <div className="bg-gradient-to-b from-[#121624] to-[#0A0D15] p-5 rounded-3xl border border-amber-500/25 shadow-xl space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <KeyRound className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-black text-white uppercase tracking-wider">
+                        Verification Codes Manager (कोड बनाएं)
+                      </h2>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {users.filter((u) => !!u.verificationCode).length} of {users.length} Active
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Sabhi user IDs ke liye verification code yahan generate aur copy karein. User is code se ₹199 Ads, ₹99 Fee, ya Deposit ko direct verify kar sakte hain.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerateAllCodes}
+                    disabled={isGeneratingAll}
+                    className="py-2 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-400 hover:to-red-500 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 border border-amber-400/50 uppercase tracking-wider"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAll ? 'animate-spin' : ''}`} />
+                    <span>{isGeneratingAll ? 'Generating...' : '⚡ Generate Codes for All Users'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Master Override Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80 text-xs">
+                <div className="p-3 rounded-2xl bg-[#090C15] border border-amber-500/20 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] text-slate-400 font-semibold block">Universal Master Verification Code:</span>
+                    <span className="font-mono text-sm font-black text-amber-300 tracking-wider">DS-MASTER</span>
+                  </div>
+                  <button
+                    onClick={() => handleCopy('DS-MASTER')}
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 font-bold text-xs flex items-center gap-1 cursor-pointer border border-amber-500/30"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-[#090C15] border border-slate-800 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] text-slate-400 font-semibold block">Total User Accounts:</span>
+                    <span className="font-mono text-sm font-black text-emerald-400">{users.length} Registered</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-1 rounded-lg border border-slate-800">
+                    Cloud Synced
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Search Filter Bar */}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/70" />
+              <input
+                type="text"
+                value={codeSearchQuery}
+                onChange={(e) => setCodeSearchQuery(e.target.value)}
+                placeholder="Search user by Name, Mobile, Email, or Verification Code (DS-XXXXXX)..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#080B12] border border-slate-700/80 text-xs text-white placeholder:text-slate-500 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all font-medium"
+              />
+            </div>
+
+            {/* Verification Codes Grid / Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {users
+                .filter((u) => {
+                  if (!codeSearchQuery.trim()) return true;
+                  const q = codeSearchQuery.toLowerCase();
+                  return (
+                    u.name.toLowerCase().includes(q) ||
+                    u.phone.toLowerCase().includes(q) ||
+                    u.email.toLowerCase().includes(q) ||
+                    (u.verificationCode && u.verificationCode.toLowerCase().includes(q))
+                  );
+                })
+                .map((u) => {
+                  const currentCode = u.verificationCode || 'DS-PENDING';
+                  const customVal = customCodeInputs[u.id] !== undefined ? customCodeInputs[u.id] : '';
+                  const cleanPhone = u.phone.replace(/\D/g, '').slice(-10);
+
+                  return (
+                    <div
+                      key={u.id}
+                      className="p-4 rounded-2xl bg-gradient-to-b from-[#111524] to-[#0A0D15] border border-amber-500/25 hover:border-amber-400/50 shadow-lg space-y-3 transition-all"
+                    >
+                      {/* User Top Info */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-red-600 p-[1px] shrink-0">
+                            <div className="w-full h-full bg-[#0D101A] rounded-xl flex items-center justify-center font-bold text-amber-300 text-xs">
+                              {u.name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-white text-xs truncate">{u.name}</div>
+                            <div className="text-[11px] text-amber-300/90 font-mono truncate">{u.phone}</div>
+                            <div className="text-[10px] text-slate-500 truncate">{u.email}</div>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ${
+                            u.status === 'ACTIVE'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          }`}
+                        >
+                          {u.status}
+                        </span>
+                      </div>
+
+                      {/* Prominent Verification Code Box */}
+                      <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/30 space-y-2">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span className="font-bold text-amber-300 flex items-center gap-1">
+                            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Assigned Verification Code</span>
+                          </span>
+                          <span className="font-mono text-slate-500">ID: {u.id.slice(-6)}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 bg-[#0E1322] px-3 py-2 rounded-lg border border-amber-500/40">
+                          <span className="font-mono text-base font-black tracking-widest text-white">
+                            {currentCode}
+                          </span>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(currentCode)}
+                              className="py-1 px-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border border-amber-500/40"
+                              title="Copy code"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRegenerateCode(u)}
+                              className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700"
+                              title="Generate new random code"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Inline Custom Code Setter */}
+                        <div className="flex items-center gap-1 pt-1">
+                          <input
+                            type="text"
+                            placeholder="Custom code..."
+                            value={customVal}
+                            onChange={(e) =>
+                              setCustomCodeInputs({
+                                ...customCodeInputs,
+                                [u.id]: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="flex-1 px-2.5 py-1 rounded-lg bg-[#07090F] border border-slate-800 text-[11px] text-amber-300 font-mono uppercase focus:outline-hidden focus:border-amber-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleCustomCodeSave(u)}
+                            className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-200 hover:text-amber-300 text-[10px] font-bold transition-all cursor-pointer border border-slate-700"
+                          >
+                            Set
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Feature Unlock Badges & 1-Click Toggles */}
+                      <div className="space-y-1.5 pt-1 text-[11px]">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>₹199 Ads Unlock:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserFeature(u, 'ads')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                              u.hasPaidAdsActivation
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+                            }`}
+                          >
+                            {u.hasPaidAdsActivation ? 'UNLOCKED ✓' : 'LOCKED (Toggle)'}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>₹99 Withdrawal Fee:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserFeature(u, 'fee')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                              u.hasPaidWithdrawalFee
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+                            }`}
+                          >
+                            {u.hasPaidWithdrawalFee ? 'UNLOCKED ✓' : 'LOCKED (Toggle)'}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>₹99 5G Turbo Boost:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserFeature(u, 'turbo')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                              u.hasPaidSpeedTurbo
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+                            }`}
+                          >
+                            {u.hasPaidSpeedTurbo ? 'UNLOCKED ✓' : 'LOCKED (Toggle)'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* WhatsApp Direct Share Button */}
+                      {cleanPhone.length === 10 && (
+                        <a
+                          href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
+                            `Namaste ${u.name}! Aapki DataSell ID ka Verification Code hai: *${currentCode}*. Is code ko payment screen par Verification Code me enter karke verify karein.`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-1.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span>Send Code via WhatsApp</span>
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ==================== MODAL 1: EDIT USER MODAL ==================== */}
@@ -2436,6 +2785,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     className="w-full px-3 py-2 rounded-xl bg-[#080B12] border border-slate-700 text-amber-300 font-mono font-bold"
                   />
                 </div>
+              </div>
+
+              {/* Verification Code Box */}
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Verification Code (सत्यापन कोड)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser({
+                      ...editingUser,
+                      verificationCode: 'DS-' + Math.floor(100000 + Math.random() * 900000)
+                    })}
+                    className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 font-bold cursor-pointer"
+                  >
+                    🎲 Generate New Code
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={editingUser.verificationCode || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, verificationCode: e.target.value.toUpperCase() })}
+                  placeholder="e.g. DS-492810"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-amber-500/30 font-mono text-amber-200 font-bold uppercase tracking-widest text-sm"
+                />
+                <p className="text-[11px] text-amber-200/70">
+                  User is code se ₹199 Ads, ₹99 Fee, ya ₹99 Turbo ko instant verify/unlock kar sakta hai.
+                </p>
               </div>
 
               {/* Balance Adjuster with Quick Buttons */}

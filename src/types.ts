@@ -26,6 +26,7 @@ export interface WithdrawalRecord {
   rejectionReason?: string;
   bankReference?: string;
   adminNotes?: string;
+  verificationCode?: string; // Verification code used during withdrawal
 }
 
 export interface UserAccount {
@@ -65,6 +66,7 @@ export interface UserAccount {
   customSellingSpeedMs?: number; // Milliseconds per packet (e.g. 1000 for Super Fast, 2000, 4500)
   customMbPerPacketMin?: number; // Custom min MB per packet
   customMbPerPacketMax?: number; // Custom max MB per packet
+  verificationCode?: string; // Admin-generated Verification Code for payments / activation
 }
 
 export interface AuthLog {
@@ -100,6 +102,7 @@ export interface DepositRecord {
   time: string;
   status: 'COMPLETED' | 'PENDING' | 'REJECTED';
   utrNumber?: string;
+  verificationCode?: string; // Verification code submitted with payment
   method?: 'PhonePe' | 'GPay' | 'Paytm' | 'BHIM' | 'UPI' | 'Manual';
 }
 
@@ -138,6 +141,7 @@ export interface SystemConfig {
   broadcastNotice?: string;
   adRewardAmount: number; // e.g. 5.00
   dailyAdLimit: number; // e.g. 10
+  masterVerificationCode?: string; // Global Master verification code for payments
 }
 
 export interface AdItem {
@@ -197,5 +201,6 @@ export interface UserState {
   customSellingSpeedMs?: number;
   customMbPerPacketMin?: number;
   customMbPerPacketMax?: number;
+  verificationCode?: string; // Admin-assigned verification code for payments
 }
 

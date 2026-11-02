@@ -12,7 +12,8 @@ import {
   Smartphone,
   CreditCard,
   Zap,
-  Info
+  Info,
+  KeyRound
 } from 'lucide-react';
 import { UserState, DepositRecord, DepositGatewayConfig } from '../types';
 import { formatDateTime } from '../utils';
@@ -39,6 +40,7 @@ export const DepositView: React.FC<DepositViewProps> = ({
   const [amount, setAmount] = useState<string>(initialAmount);
   const [method, setMethod] = useState<'PhonePe' | 'GPay' | 'Paytm' | 'BHIM' | 'UPI'>('PhonePe');
   const [utrNumber, setUtrNumber] = useState<string>('');
+  const [verificationCode, setVerificationCode] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -75,19 +77,27 @@ export const DepositView: React.FC<DepositViewProps> = ({
     }
 
     const cleanUtr = utrNumber.trim();
-    if (cleanUtr.length < 6) {
+    const cleanCode = verificationCode.trim().toUpperCase();
+
+    if (!cleanUtr && !cleanCode) {
+      setErrorMsg('Kripya 12-digit UPI UTR number ya Admin dwara mila Verification Code darj karein.');
+      return;
+    }
+
+    if (cleanUtr && cleanUtr.length < 6 && !cleanCode) {
       setErrorMsg('Please enter a valid 12-digit UPI Reference Number / UTR.');
       return;
     }
 
     const newRecord: DepositRecord = {
       id: 'dep_' + Date.now().toString(),
-      userId: userState.email,
+      userId: userState.id || userState.email,
       userEmail: userState.email,
       amount: numAmount,
       type: 'UPI_DEPOSIT',
-      note: `User deposit via ${method}`,
-      utrNumber: cleanUtr,
+      note: cleanCode ? `User deposit via ${method} [Code: ${cleanCode}]` : `User deposit via ${method}`,
+      utrNumber: cleanUtr || `CODE_${cleanCode}`,
+      verificationCode: cleanCode,
       status: 'PENDING',
       method,
       time: formatDateTime(new Date()),
@@ -285,18 +295,52 @@ export const DepositView: React.FC<DepositViewProps> = ({
               </div>
             )}
 
+            {/* Admin Verification Code Field */}
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Verification Code (सत्यापन कोड)</span>
+                </label>
+                <span className="text-[10px] font-semibold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                  Instant Approve
+                </span>
+              </div>
+              <input
+                type="text"
+                value={verificationCode}
+                onChange={(e) => {
+                  setVerificationCode(e.target.value.toUpperCase());
+                  setErrorMsg(null);
+                }}
+                placeholder="e.g. DS-492810 ya Admin Code"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-amber-500/30 text-amber-200 font-mono text-sm tracking-wider focus:outline-hidden focus:border-amber-400 uppercase placeholder:normal-case placeholder:text-slate-600"
+              />
+              <p className="text-[11px] text-amber-200/80">
+                Agar Admin dwara Verification Code mila hai toh yahan darj karein.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 my-1">
+              <div className="h-px bg-slate-800 flex-1" />
+              <span className="text-[10px] uppercase font-bold text-slate-500">YA / OR</span>
+              <div className="h-px bg-slate-800 flex-1" />
+            </div>
+
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-300">
                   12-Digit UPI Reference Number / UTR
                 </label>
-                <span className="text-[10px] text-cyan-400 font-mono">Mandatory</span>
+                <span className="text-[10px] text-cyan-400 font-mono">UPI Transfer</span>
               </div>
               <input
                 type="text"
-                required
                 value={utrNumber}
-                onChange={(e) => setUtrNumber(e.target.value)}
+                onChange={(e) => {
+                  setUtrNumber(e.target.value);
+                  setErrorMsg(null);
+                }}
                 placeholder="e.g. 423985729103"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm tracking-wider focus:outline-hidden focus:border-cyan-400"
               />
@@ -311,7 +355,7 @@ export const DepositView: React.FC<DepositViewProps> = ({
               className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer min-h-[46px] flex items-center justify-center gap-2"
             >
               <Zap className="w-4 h-4" />
-              <span>Submit UTR for Instant Credit (₹{numAmount.toFixed(2)})</span>
+              <span>Submit & Verify Deposit (₹{numAmount.toFixed(2)})</span>
             </button>
           </form>
 

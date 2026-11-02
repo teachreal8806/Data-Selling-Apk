@@ -26,29 +26,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [ifscCode, setIfscCode] = useState(userState.savedBankDetails?.ifscCode || '');
   const [isSaved, setIsSaved] = useState(false);
 
-  // Hidden 10-tap trigger for Master Admin Panel
-  const [tapCount, setTapCount] = useState(0);
+  // Hidden 10-tap trigger for Master Admin Panel using ref to avoid setState-in-render issues
+  const tapCountRef = useRef(0);
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleSecretAdminTap = () => {
-    setTapCount((prev) => {
-      const next = prev + 1;
+  React.useEffect(() => {
+    return () => {
       if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    };
+  }, []);
 
-      tapTimerRef.current = setTimeout(() => {
-        setTapCount(0);
-      }, 3500);
+  const handleSecretAdminTap = () => {
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
 
-      if (next >= 10) {
-        setTapCount(0);
-        if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-        if (onOpenAdmin) {
-          onOpenAdmin();
-        }
+    tapCountRef.current += 1;
+    if (tapCountRef.current >= 10) {
+      tapCountRef.current = 0;
+      if (onOpenAdmin) {
+        onOpenAdmin();
       }
-
-      return next;
-    });
+    } else {
+      tapTimerRef.current = setTimeout(() => {
+        tapCountRef.current = 0;
+      }, 3500);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -24,6 +24,37 @@
   },
   "users": [
     {
+      "id": "usr_1793634754190_1qbo",
+      "name": "Vikas Singh",
+      "email": "9812345678@datasell.in",
+      "phone": "+91 9812345678",
+      "password": "mypassword99",
+      "balance": 250,
+      "totalSoldMB": 0,
+      "tier": "BRONZE",
+      "status": "ACTIVE",
+      "savedUpiId": "",
+      "selectedPaymentMethod": "BANK",
+      "signupTime": "02/11/2026, 03:52:34 pm",
+      "lastLoginTime": "02/11/2026, 03:52:54 pm",
+      "lastActiveTime": "02/11/2026, 03:52:54 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "requireDepositBeforeWithdrawal": false,
+      "requiredDepositAmount": 200,
+      "hasCompletedRequiredDeposit": true,
+      "hasPaidAdsActivation": false,
+      "hasPaidWithdrawalFee": false,
+      "hasPaidSpeedTurbo": false,
+      "withdrawalCount": 0,
+      "savedBankDetails": {
+        "accountHolderName": "Vikas Singh",
+        "bankName": "HDFC Bank",
+        "accountNumber": "50100412345678",
+        "ifscCode": "HDFC0001234"
+      }
+    },
+    {
       "id": "usr_1793115005687_hoqv",
       "name": "9123456789",
       "email": "9123456789@datasell.in",
@@ -84,7 +115,7 @@
       "name": "Deepak Kumar",
       "email": "techreal8806@gmail.com",
       "phone": "7543355356",
-      "password": "randompassword",
+      "password": "1234",
       "balance": 100,
       "totalSoldMB": 450,
       "tier": "SILVER",
@@ -263,6 +294,25 @@
   ],
   "withdrawals": [
     {
+      "id": "wd_1793634778605_9m4w",
+      "userId": "usr_1793634754190_1qbo",
+      "userEmail": "9812345678@datasell.in",
+      "userName": "Vikas Singh",
+      "orderNumber": "ORD737330962278",
+      "amount": 250,
+      "type": "BANK",
+      "upiId": "",
+      "bankDetails": {
+        "accountHolderName": "Vikas Singh",
+        "bankName": "HDFC Bank",
+        "accountNumber": "50100412345678",
+        "ifscCode": "HDFC0001234"
+      },
+      "time": "02/11/2026, 03:52:58 pm",
+      "status": "SUCCESSFUL",
+      "bankReference": "HDFC982347102938"
+    },
+    {
       "id": "wd_1793026286139_ju8w",
       "userId": "usr_admin_default",
       "userEmail": "techreal8806@gmail.com",
@@ -331,8 +381,68 @@
       "status": "SUCCESSFUL"
     }
   ],
-  "deposits": [],
+  "deposits": [
+    {
+      "id": "dep_1793634758234",
+      "userId": "usr_1793634754190_1qbo",
+      "userEmail": "9812345678@datasell.in",
+      "amount": 500,
+      "type": "ADMIN_CREDIT",
+      "note": "Admin Test Credit",
+      "time": "02/11/2026, 03:52:38 pm",
+      "status": "COMPLETED",
+      "method": "Manual"
+    }
+  ],
   "authLogs": [
+    {
+      "id": "log_1793634774329_xqha",
+      "userId": "usr_1793634754190_1qbo",
+      "userEmail": "9812345678@datasell.in",
+      "userName": "Vikas Singh",
+      "userPhone": "+91 9812345678",
+      "type": "LOGIN",
+      "timestamp": "02/11/2026, 03:52:54 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "log_1793634770767_xq7f",
+      "userId": "usr_1793634754190_1qbo",
+      "userEmail": "9812345678@datasell.in",
+      "userName": "Vikas Singh",
+      "userPhone": "+91 9812345678",
+      "type": "LOGIN",
+      "timestamp": "02/11/2026, 03:52:50 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "log_1793634762214_v06p",
+      "userId": "usr_1793634754190_1qbo",
+      "userEmail": "9812345678@datasell.in",
+      "userName": "Vikas Singh",
+      "userPhone": "+91 9812345678",
+      "type": "LOGIN",
+      "timestamp": "02/11/2026, 03:52:42 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "log_1793634754190_pxpe",
+      "userId": "usr_1793634754190_1qbo",
+      "userEmail": "9812345678@datasell.in",
+      "userName": "Vikas Singh",
+      "userPhone": "+91 9812345678",
+      "type": "SIGNUP",
+      "timestamp": "02/11/2026, 03:52:34 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
     {
       "id": "log_1793116707529_c5sz",
       "userId": "usr_1792764170784_updx",

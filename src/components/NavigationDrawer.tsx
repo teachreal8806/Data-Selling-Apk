@@ -37,29 +37,30 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const [drawerTapCount, setDrawerTapCount] = React.useState(0);
+  const drawerTapCountRef = React.useRef(0);
   const drawerTapTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  const handleDrawerSecretTap = () => {
-    setDrawerTapCount((prev) => {
-      const next = prev + 1;
+  React.useEffect(() => {
+    return () => {
       if (drawerTapTimerRef.current) clearTimeout(drawerTapTimerRef.current);
+    };
+  }, []);
 
-      drawerTapTimerRef.current = setTimeout(() => {
-        setDrawerTapCount(0);
-      }, 3500);
+  const handleDrawerSecretTap = () => {
+    if (drawerTapTimerRef.current) clearTimeout(drawerTapTimerRef.current);
 
-      if (next >= 10) {
-        setDrawerTapCount(0);
-        if (drawerTapTimerRef.current) clearTimeout(drawerTapTimerRef.current);
-        onClose();
-        if (onOpenAdmin) {
-          onOpenAdmin();
-        }
+    drawerTapCountRef.current += 1;
+    if (drawerTapCountRef.current >= 10) {
+      drawerTapCountRef.current = 0;
+      onClose();
+      if (onOpenAdmin) {
+        onOpenAdmin();
       }
-
-      return next;
-    });
+    } else {
+      drawerTapTimerRef.current = setTimeout(() => {
+        drawerTapCountRef.current = 0;
+      }, 3500);
+    }
   };
 
   const navItems = [

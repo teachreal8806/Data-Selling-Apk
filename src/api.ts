@@ -24,7 +24,7 @@ export const api = {
     return null;
   },
 
-  // Auth: Signup on any mobile with automatic offline fallback
+  // Auth: Signup on any mobile
   async signup(data: {
     email: string;
     password?: string;
@@ -46,58 +46,24 @@ export const api = {
         console.warn('Non-JSON response in signup', parseErr);
       }
 
-      if (res.ok && json) {
+      if (res.ok && json && (json.success || json.user)) {
         return {
           ...json,
           log: json.authLog || json.log,
         };
       }
       if (json && json.error) {
-        return { error: json.error };
+        return { error: json.error, code: json.code };
       }
+      return { error: 'Registration failed. Please check details and try again.' };
     } catch (e) {
-      console.warn('API signup network error, initializing local fallback:', e);
+      console.warn('API signup network error:', e);
+      return { error: 'Central Cloud Server unavailable. Please check internet connection.' };
     }
-
-    // Local registration fallback for offline mode
-    const cleanEmail = (data.email || '').toLowerCase().trim();
-    const fallbackUser: UserAccount = {
-      id: 'usr_' + Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
-      email: cleanEmail,
-      name: data.name?.trim() || cleanEmail.split('@')[0],
-      phone: data.phone?.trim() || '+91 98000 00000',
-      password: data.password || '1234',
-      status: 'ACTIVE',
-      balance: 0,
-      totalSoldMB: 0,
-      tier: 'BRONZE',
-      savedUpiId: '',
-      selectedPaymentMethod: 'PhonePe',
-      signupTime: new Date().toLocaleString('en-IN'),
-      lastLoginTime: new Date().toLocaleString('en-IN'),
-      lastActiveTime: new Date().toLocaleString('en-IN'),
-      ipAddress: '103.21.244.18 (Mobile)',
-      device: data.device || 'Mobile Device',
-    };
-
-    const fallbackLog: AuthLog = {
-      id: 'log_' + Date.now().toString(),
-      userId: fallbackUser.id,
-      userEmail: fallbackUser.email,
-      userName: fallbackUser.name,
-      userPhone: fallbackUser.phone,
-      type: 'SIGNUP',
-      timestamp: new Date().toLocaleString('en-IN'),
-      ipAddress: fallbackUser.ipAddress || '103.21.244.18',
-      device: fallbackUser.device || 'Mobile App',
-      status: 'SUCCESS',
-    };
-
-    return { success: true, isNew: true, user: fallbackUser, log: fallbackLog };
   },
 
   // Auth: Login - Strictly verifies credentials against registered accounts
-  // NEVER creates a new account on login!
+  // NEVER creates a dummy/demo account on login!
   async login(data: { email: string; password?: string; device?: string }) {
     const cleanInput = (data.email || '').toLowerCase().trim();
     const cleanPass = (data.password !== undefined && data.password !== null) ? String(data.password).trim() : '';
@@ -116,105 +82,22 @@ export const api = {
         console.warn('Non-JSON response in login', parseErr);
       }
 
-      if (json && json.success) {
+      if (res.ok && json && json.success) {
         return {
           ...json,
           log: json.authLog || json.log,
         };
       }
-      if (res.ok && json) {
-        return {
-          ...json,
-          log: json.authLog || json.log,
-        };
-      }
-      if (json && json.error && json.code === 'USER_BLOCKED') {
+
+      if (json && json.error) {
         return { error: json.error, code: json.code };
       }
+
+      return { error: 'Login failed. Please verify your Mobile Number / Password.' };
     } catch (e) {
       console.warn('API login network error:', e);
+      return { error: 'Central Cloud Server unavailable. Please check internet connection.' };
     }
-
-    // Local cached users check: restore user or generate local node
-    try {
-      const cachedUsersStr = localStorage.getItem('datasell_users_list');
-      if (cachedUsersStr) {
-        const cachedUsers: UserAccount[] = JSON.parse(cachedUsersStr);
-        const inputDigits = cleanInput.replace(/\D/g, '');
-        const matched = cachedUsers.find((u) => {
-          if (!u) return false;
-          const uEmail = (u.email || '').toLowerCase().trim();
-          if (uEmail && uEmail === cleanInput) return true;
-          if (cleanInput.length >= 7 && u.phone) {
-            const uDigits = String(u.phone).replace(/\D/g, '');
-            if (uDigits && inputDigits && (uDigits.endsWith(inputDigits) || inputDigits.endsWith(uDigits))) {
-              return true;
-            }
-          }
-          return false;
-        });
-
-        if (matched) {
-          return {
-            success: true,
-            user: matched,
-            isOffline: true,
-            log: {
-              id: 'log_' + Date.now().toString(),
-              userId: matched.id,
-              userEmail: matched.email,
-              userName: matched.name,
-              userPhone: matched.phone,
-              type: 'LOGIN' as const,
-              timestamp: new Date().toLocaleString('en-IN'),
-              ipAddress: '127.0.0.1 (Local)',
-              device: data.device || 'Mobile App',
-              status: 'SUCCESS' as const,
-            }
-          };
-        }
-      }
-    } catch (localErr) {
-      console.error('Error checking local user cache', localErr);
-    }
-
-    // Auto-create local user session if server is offline
-    const isPhone = cleanInput.replace(/\D/g, '').length >= 10;
-    const fallbackUser: UserAccount = {
-      id: 'usr_' + Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
-      email: cleanInput.includes('@') ? cleanInput : `${cleanInput.replace(/\D/g, '') || cleanInput}@datasell.in`,
-      name: cleanInput.split('@')[0],
-      phone: isPhone ? `+91 ${cleanInput.replace(/\D/g, '').slice(-10)}` : '+91 98000 00000',
-      password: cleanPass || '1234',
-      status: 'ACTIVE',
-      balance: 0,
-      totalSoldMB: 0,
-      tier: 'BRONZE',
-      savedUpiId: '',
-      selectedPaymentMethod: 'PhonePe',
-      signupTime: new Date().toLocaleString('en-IN'),
-      lastLoginTime: new Date().toLocaleString('en-IN'),
-      lastActiveTime: new Date().toLocaleString('en-IN'),
-      ipAddress: '103.21.244.18 (Mobile)',
-      device: data.device || 'Mobile Device',
-    };
-
-    return { 
-      success: true, 
-      user: fallbackUser, 
-      log: {
-        id: 'log_' + Date.now().toString(),
-        userId: fallbackUser.id,
-        userEmail: fallbackUser.email,
-        userName: fallbackUser.name,
-        userPhone: fallbackUser.phone,
-        type: 'LOGIN' as const,
-        timestamp: new Date().toLocaleString('en-IN'),
-        ipAddress: '103.21.244.18',
-        device: data.device || 'Mobile App',
-        status: 'SUCCESS' as const,
-      }
-    };
   },
 
   // Stream bandwidth sell packet
@@ -265,6 +148,7 @@ export const api = {
       ifscCode: string;
     };
     orderNumber?: string;
+    verificationCode?: string;
   }) {
     try {
       const res = await fetch('/api/withdrawals', {
@@ -315,7 +199,7 @@ export const api = {
     }
   },
 
-  // Submit deposit
+  // Submit deposit with optional verification code
   async submitDeposit(data: {
     userId?: string;
     userEmail: string;
@@ -323,6 +207,7 @@ export const api = {
     type?: string;
     note?: string;
     utrNumber?: string;
+    verificationCode?: string;
     method?: string;
   }) {
     try {
@@ -336,6 +221,39 @@ export const api = {
       }
     } catch (e) {
       console.warn('API submitDeposit offline', e);
+    }
+    return null;
+  },
+
+  // ADMIN: Set or generate a verification code for a specific user ID
+  async setVerificationCode(data: { userId: string; userEmail?: string; verificationCode?: string }) {
+    try {
+      const res = await fetch('/api/admin/set-verification-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('API setVerificationCode offline', e);
+    }
+    return null;
+  },
+
+  // ADMIN: Auto-generate verification codes for all users
+  async generateAllCodes() {
+    try {
+      const res = await fetch('/api/admin/generate-all-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('API generateAllCodes offline', e);
     }
     return null;
   },

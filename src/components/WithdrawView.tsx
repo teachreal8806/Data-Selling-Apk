@@ -12,7 +12,8 @@ import {
   Check,
   Clock,
   Zap,
-  Info
+  Info,
+  KeyRound
 } from 'lucide-react';
 import { UserState, BankDetails } from '../types';
 
@@ -23,7 +24,8 @@ interface WithdrawViewProps {
     amount: number, 
     upiId: string, 
     method: 'PhonePe' | 'GPay' | 'UPI' | 'BANK',
-    bankDetails?: BankDetails
+    bankDetails?: BankDetails,
+    verificationCode?: string
   ) => boolean;
   onGoToHistory: () => void;
   onOpenDeposit?: () => void;
@@ -73,6 +75,9 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [verificationCode, setVerificationCode] = useState<string>(
+    userState.verificationCode || ''
+  );
 
   const quickAmounts = isFirstWithdrawal ? [250, 500, 1000, 2000] : [500, 1000, 1500, 2500];
 
@@ -129,6 +134,8 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
       return;
     }
 
+    const cleanCode = verificationCode.trim().toUpperCase();
+
     if (payoutChannel === 'UPI') {
       const cleanUpi = upiId.trim();
       if (!cleanUpi || !cleanUpi.includes('@') || cleanUpi.length < 5) {
@@ -136,7 +143,7 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
         return;
       }
 
-      const success = onSubmitWithdrawal(numAmount, cleanUpi, selectedUpiApp);
+      const success = onSubmitWithdrawal(numAmount, cleanUpi, selectedUpiApp, undefined, cleanCode);
       if (success) {
         setShowSuccessModal(true);
       }
@@ -173,7 +180,7 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
         ifscCode: cleanIfsc,
       };
 
-      const success = onSubmitWithdrawal(numAmount, '', 'BANK', bankDetails);
+      const success = onSubmitWithdrawal(numAmount, '', 'BANK', bankDetails, cleanCode);
       if (success) {
         setShowSuccessModal(true);
       }
@@ -481,6 +488,29 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* Verification Code Box (Admin Code) */}
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-1.5 mt-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+              <span>Verification Code (सत्यापन कोड)</span>
+            </label>
+            <span className="text-[10px] font-semibold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+              Admin Code
+            </span>
+          </div>
+          <input
+            type="text"
+            value={verificationCode}
+            onChange={(e) => setVerificationCode(e.target.value.toUpperCase())}
+            placeholder="e.g. DS-492810"
+            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-amber-500/30 text-amber-200 font-mono text-xs tracking-wider focus:outline-hidden focus:border-amber-400 uppercase placeholder:normal-case placeholder:text-slate-600"
+          />
+          <p className="text-[11px] text-amber-200/70">
+            Admin dwara mila security verification code yahan darj karein (yadi mila ho).
+          </p>
+        </div>
 
         <button
           type="submit"

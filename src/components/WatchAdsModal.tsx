@@ -113,7 +113,6 @@ export const WatchAdsModal: React.FC<WatchAdsModalProps> = ({
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setIsCompleted(true);
           return 0;
         }
         return prev - 1;
@@ -122,6 +121,12 @@ export const WatchAdsModal: React.FC<WatchAdsModalProps> = ({
 
     return () => clearInterval(timer);
   }, [isOpen, currentAd]);
+
+  React.useEffect(() => {
+    if (timeLeft === 0 && isOpen) {
+      setIsCompleted(true);
+    }
+  }, [timeLeft, isOpen]);
 
   if (!isOpen) return null;
 

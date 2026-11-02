@@ -179,7 +179,20 @@ function getDB() {
       return DEFAULT_DB;
     }
     const data = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    let modified = false;
+    if (Array.isArray(parsed.users)) {
+      for (const u of parsed.users) {
+        if (!u.verificationCode) {
+          u.verificationCode = 'DS-' + Math.floor(100000 + Math.random() * 900000);
+          modified = true;
+        }
+      }
+    }
+    if (modified) {
+      saveDB(parsed);
+    }
+    return parsed;
   } catch (err) {
     console.error('Error reading db:', err);
     return DEFAULT_DB;
@@ -201,23 +214,73 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Sync user data & get system config
+// Universal user finder across email, 10-digit phone number, user ID, or username
+export function findUserInDB(users: any[], rawInput: string) {
+  if (!rawInput || !Array.isArray(users)) return null;
+  const cleanInput = rawInput.toLowerCase().trim();
+  const digits = cleanInput.replace(/\D/g, '');
+  const digits10 = digits.length >= 10 ? digits.slice(-10) : digits;
+
+  return users.find((u: any) => {
+    if (!u) return false;
+    const uEmail = (u.email || '').toLowerCase().trim();
+    const uPhone = (u.phone || '').trim();
+    const uId = (u.id || '').trim();
+
+    // 1. Direct Email match
+    if (uEmail && uEmail === cleanInput) return true;
+
+    // 2. Email username match (e.g. "techreal8806" matches "techreal8806@gmail.com")
+    if (uEmail && uEmail.split('@')[0] === cleanInput) return true;
+
+    // 3. Exact User ID match (e.g. "usr_admin_default" or "usr_1793025355000_a3dl")
+    if (uId && (uId.toLowerCase() === cleanInput || uId === rawInput.trim())) return true;
+
+    // 4. Phone number digit matching (10-digit normalized)
+    if (uPhone && digits.length >= 7) {
+      const uDigits = uPhone.replace(/\D/g, '');
+      const uDigits10 = uDigits.length >= 10 ? uDigits.slice(-10) : uDigits;
+      if (digits10.length === 10 && uDigits10.length === 10 && digits10 === uDigits10) {
+        return true;
+      }
+      if (uDigits === digits) return true;
+      if (uDigits.endsWith(digits) || digits.endsWith(uDigits)) return true;
+    }
+
+    // 5. If user's email was created as <digits10>@datasell.in or matches digits
+    if (digits10.length === 10 && uEmail) {
+      if (uEmail === `${digits10}@datasell.in` || uEmail.startsWith(`${digits10}@`)) {
+        return true;
+      }
+    }
+
+    // 6. Direct Name match if exact match
+    if (u.name && u.name.toLowerCase().trim() === cleanInput) return true;
+
+    return false;
+  });
+}
+
+// Sync user data & get system config across all devices
 app.get('/api/user/sync', (req: Request, res: Response) => {
-  const email = (req.query.email as string || '').toLowerCase().trim();
+  const queryParam = (req.query.email as string || req.query.userId as string || '').trim();
   const db = getDB();
-  const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
-  const ipAddress = rawIp.split(',')[0].trim();
-  const userDevice = req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser';
   const now = new Date().toLocaleString('en-IN');
 
-  let user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === email);
+  const user = findUserInDB(db.users, queryParam);
   if (user) {
     user.lastActiveTime = now;
   }
 
-  // ONLY return this user's withdrawals & deposits
-  const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail && w.userEmail.toLowerCase().trim() === email);
-  const userDeposits = db.deposits.filter((d: any) => d.userEmail && d.userEmail.toLowerCase().trim() === email);
+  const userWithdrawals = user ? db.withdrawals.filter((w: any) => 
+    (w.userId && w.userId === user.id) || 
+    (w.userEmail && w.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim())
+  ) : [];
+
+  const userDeposits = user ? db.deposits.filter((d: any) => 
+    (d.userId && d.userId === user.id) || 
+    (d.userEmail && d.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim())
+  ) : [];
 
   res.json({
     user: user || null,
@@ -230,17 +293,22 @@ app.get('/api/user/sync', (req: Request, res: Response) => {
   });
 });
 
-// Authentication: Sign Up on any mobile
+// Authentication: Sign Up on any mobile (creates central persistent account)
 app.post('/api/auth/signup', (req: Request, res: Response) => {
   const { email, password, name, phone, device, ip } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+  const rawInput = (email || '').toString().trim();
+  const rawPass = (password !== undefined && password !== null) ? String(password).trim() : '';
+  const rawName = (name || '').toString().trim();
+  const rawPhone = (phone || '').toString().trim();
+
+  if (!rawInput && !rawPhone) {
+    return res.status(400).json({ error: 'Mobile Number or Email is required' });
+  }
+  if (!rawPass) {
+    return res.status(400).json({ error: 'Password / PIN is required' });
   }
 
   const db = getDB();
-  const lowerEmail = email.toLowerCase().trim();
-  const cleanPhone = (phone || '').trim();
-
   const now = new Date().toLocaleString('en-IN', {
     day: '2-digit',
     month: '2-digit',
@@ -255,54 +323,80 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
   const ipAddress = rawIp.split(',')[0].trim();
   const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
 
-  let existingUser = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === lowerEmail);
+  // Normalize phone & email
+  const digits = (rawPhone || rawInput).replace(/\D/g, '');
+  const digits10 = digits.length >= 10 ? digits.slice(-10) : digits;
+
+  const normalizedEmail = rawInput.includes('@')
+    ? rawInput.toLowerCase()
+    : `${digits10 || rawInput.toLowerCase()}@datasell.in`;
+
+  const normalizedPhone = digits10.length === 10
+    ? `+91 ${digits10}`
+    : (rawPhone || '+91 98000 00000');
+
+  // Check if user already exists in central database
+  let existingUser = findUserInDB(db.users, rawInput) || 
+                     (digits10.length >= 7 ? findUserInDB(db.users, digits10) : null) ||
+                     findUserInDB(db.users, normalizedEmail);
 
   if (existingUser) {
-    // If user already existed, update credentials with real info entered during signup
-    if (name) existingUser.name = name.trim();
-    if (cleanPhone) existingUser.phone = cleanPhone;
-    if (password) existingUser.password = password.trim();
-    existingUser.lastLoginTime = now;
-    existingUser.lastActiveTime = now;
-    existingUser.ipAddress = ipAddress;
-    existingUser.device = userDevice;
+    // If entered password matches existing password, log in seamlessly
+    if (existingUser.password && String(existingUser.password).trim() === rawPass) {
+      existingUser.lastLoginTime = now;
+      existingUser.lastActiveTime = now;
+      existingUser.ipAddress = ipAddress;
+      existingUser.device = userDevice;
 
-    const authLog = {
-      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      userId: existingUser.id,
-      userEmail: existingUser.email,
-      userName: existingUser.name,
-      userPhone: existingUser.phone,
-      type: 'SIGNUP',
-      timestamp: now,
-      ipAddress: ipAddress,
-      device: userDevice,
-      status: 'SUCCESS',
-    };
-    db.authLogs.unshift(authLog);
-    saveDB(db);
+      const authLog = {
+        id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        userId: existingUser.id,
+        userEmail: existingUser.email,
+        userName: existingUser.name,
+        userPhone: existingUser.phone,
+        type: 'SIGNUP',
+        timestamp: now,
+        ipAddress: ipAddress,
+        device: userDevice,
+        status: 'SUCCESS',
+      };
+      db.authLogs.unshift(authLog);
+      saveDB(db);
 
-    const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail && w.userEmail.toLowerCase().trim() === lowerEmail);
-    const userDeposits = db.deposits.filter((d: any) => d.userEmail && d.userEmail.toLowerCase().trim() === lowerEmail);
-    return res.json({
-      success: true,
-      isNew: false,
-      user: existingUser,
-      withdrawals: userWithdrawals,
-      deposits: userDeposits,
-      authLog,
-    });
+      const userWithdrawals = db.withdrawals.filter((w: any) => 
+        (w.userId && w.userId === existingUser.id) || 
+        (w.userEmail && w.userEmail.toLowerCase().trim() === existingUser.email.toLowerCase().trim())
+      );
+      const userDeposits = db.deposits.filter((d: any) => 
+        (d.userId && d.userId === existingUser.id) || 
+        (d.userEmail && d.userEmail.toLowerCase().trim() === existingUser.email.toLowerCase().trim())
+      );
+
+      return res.json({
+        success: true,
+        isNew: false,
+        user: existingUser,
+        withdrawals: userWithdrawals,
+        deposits: userDeposits,
+        authLog,
+      });
+    } else {
+      return res.status(409).json({
+        error: 'Yeh Mobile Number / Email pehle se registered hai! Kripya "Sign In" (लॉगिन) tab par click karein aur sahi password darj karein.',
+        code: 'USER_ALREADY_EXISTS',
+      });
+    }
   }
 
-  // BRAND NEW USER on this mobile: clean slate with 0 history
+  // BRAND NEW USER: registered in central database
   const newUser = {
     id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-    name: name?.trim() || lowerEmail.split('@')[0],
-    email: lowerEmail,
-    phone: cleanPhone || '+91 9' + Math.floor(100000000 + Math.random() * 900000000),
-    password: password.trim(),
-    balance: 0.00, // Starts at 0
-    totalSoldMB: 0.00, // Starts at 0
+    name: rawName || (rawInput.includes('@') ? rawInput.split('@')[0] : digits10),
+    email: normalizedEmail,
+    phone: normalizedPhone,
+    password: rawPass,
+    balance: 0.00,
+    totalSoldMB: 0.00,
     tier: 'BRONZE',
     status: 'ACTIVE',
     savedUpiId: '',
@@ -319,11 +413,11 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
     hasPaidWithdrawalFee: false,
     hasPaidSpeedTurbo: false,
     withdrawalCount: 0,
+    verificationCode: 'DS-' + Math.floor(100000 + Math.random() * 900000),
   };
 
   db.users.unshift(newUser);
 
-  // Record audit log
   const authLog = {
     id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     userId: newUser.id,
@@ -340,8 +434,7 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
 
   saveDB(db);
 
-  // Return new user with empty history
-  res.json({
+  return res.json({
     success: true,
     isNew: true,
     user: newUser,
@@ -351,48 +444,41 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
   });
 });
 
-// Authentication: Login on any mobile with ultra-flexible matching
+// Authentication: Login - Strictly verifies against central registered accounts
+// NEVER auto-creates fake accounts on login!
 app.post('/api/auth/login', (req: Request, res: Response) => {
   const { email, password, device, ip } = req.body;
   const db = getDB();
   const rawInput = (email || '').toString().trim();
-  const cleanInput = rawInput.toLowerCase();
   const cleanPass = (password !== undefined && password !== null) ? String(password).trim() : '';
 
   if (!rawInput) {
     return res.status(400).json({ error: 'Please enter your Mobile Number or Email Address' });
   }
 
-  // Extract digits for phone search
-  const inputDigits = cleanInput.replace(/\D/g, '');
+  // Locate the user across phone, email, or user ID
+  const user = findUserInDB(db.users, rawInput);
 
-  // Flexible user matching across multiple identifiers
-  let user = db.users.find((u: any) => {
-    if (!u) return false;
-    const uEmail = (u.email || '').toLowerCase().trim();
-    const uId = (u.id || '').trim();
-    const uName = (u.name || '').toLowerCase().trim();
+  // STRICT REQUIREMENT: If account does not exist, reject! Do NOT auto-create!
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Account not found! Kripya pehle Sign Up (नया खाता) karein ya Mobile Number check karein.',
+      code: 'ACCOUNT_NOT_FOUND',
+    });
+  }
 
-    // 1. Direct email or email prefix match (e.g. "techreal8806" matches "techreal8806@gmail.com")
-    if (uEmail && (uEmail === cleanInput || uEmail.split('@')[0] === cleanInput)) return true;
-    
-    // 2. Direct User ID match (e.g. "usr_admin_default")
-    if (uId && (uId.toLowerCase() === cleanInput || uId === rawInput)) return true;
-
-    // 3. Name match
-    if (uName && uName === cleanInput) return true;
-
-    // 4. Phone number matching (exact digits or last 10 digits)
-    if (u.phone) {
-      const uDigits = String(u.phone).replace(/\D/g, '');
-      if (inputDigits.length >= 7 && uDigits.length >= 7) {
-        if (uDigits === inputDigits) return true;
-        if (uDigits.endsWith(inputDigits) || inputDigits.endsWith(uDigits)) return true;
-        if (uDigits.slice(-10) === inputDigits.slice(-10)) return true;
-      }
+  // STRICT REQUIREMENT: Password verification
+  if (user.password) {
+    const userPassword = String(user.password).trim();
+    if (cleanPass !== userPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'Incorrect Password / PIN! Kripya sahi password darj karein.',
+        code: 'INVALID_PASSWORD',
+      });
     }
-    return false;
-  });
+  }
 
   const now = new Date().toLocaleString('en-IN', {
     day: '2-digit',
@@ -408,49 +494,8 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   const ipAddress = rawIp.split(',')[0].trim();
   const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
 
-  // UNIVERSAL CROSS-MOBILE LOGIN: If account does not exist, automatically create it seamlessly!
-  if (!user) {
-    const isPhone = inputDigits.length >= 10;
-    const newEmail = cleanInput.includes('@') ? cleanInput : `${inputDigits || cleanInput}@datasell.in`;
-    const newPhone = isPhone ? `+91 ${inputDigits.slice(-10)}` : '+91 98000 00000';
-    
-    user = {
-      id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      name: cleanInput.split('@')[0],
-      email: newEmail,
-      phone: newPhone,
-      password: cleanPass || '1234',
-      balance: 0.00,
-      totalSoldMB: 0.00,
-      tier: 'BRONZE',
-      status: 'ACTIVE',
-      savedUpiId: '',
-      selectedPaymentMethod: 'PhonePe',
-      signupTime: now,
-      lastLoginTime: now,
-      lastActiveTime: now,
-      ipAddress: ipAddress,
-      device: userDevice,
-      requireDepositBeforeWithdrawal: false,
-      requiredDepositAmount: 200,
-      hasCompletedRequiredDeposit: false,
-      hasPaidAdsActivation: false,
-      hasPaidWithdrawalFee: false,
-      hasPaidSpeedTurbo: false,
-      withdrawalCount: 0,
-    };
-    db.users.unshift(user);
-  } else {
-    // Existing user: if user provided a password, sync/update it seamlessly so user is NEVER blocked!
-    if (cleanPass) {
-      user.password = cleanPass;
-    }
-
-    user.lastLoginTime = now;
-    user.lastActiveTime = now;
-    user.ipAddress = ipAddress;
-    user.device = userDevice;
-  }
+  user.lastLoginTime = now;
+  user.lastActiveTime = now;
   user.ipAddress = ipAddress;
   user.device = userDevice;
 
@@ -469,9 +514,16 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   db.authLogs.unshift(authLog);
   saveDB(db);
 
-  const userWithdrawals = db.withdrawals.filter((w: any) => w.userEmail && w.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim());
-  const userDeposits = db.deposits.filter((d: any) => d.userEmail && d.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim());
-  res.json({
+  const userWithdrawals = db.withdrawals.filter((w: any) => 
+    (w.userId && w.userId === user.id) || 
+    (w.userEmail && w.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim())
+  );
+  const userDeposits = db.deposits.filter((d: any) => 
+    (d.userId && d.userId === user.id) || 
+    (d.userEmail && d.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim())
+  );
+
+  return res.json({
     success: true,
     user,
     withdrawals: userWithdrawals,
@@ -563,6 +615,7 @@ app.post('/api/admin/create-user', (req: Request, res: Response) => {
     customSellingSpeedMs: customSellingSpeedMs ? Number(customSellingSpeedMs) : undefined,
     customMbPerPacketMin: customMbPerPacketMin ? Number(customMbPerPacketMin) : undefined,
     customMbPerPacketMax: customMbPerPacketMax ? Number(customMbPerPacketMax) : undefined,
+    verificationCode: (req.body.verificationCode || '').toString().trim().toUpperCase() || ('DS-' + Math.floor(100000 + Math.random() * 900000)),
   };
 
   db.users.unshift(newUser);
@@ -661,7 +714,7 @@ app.post('/api/ads/reward', (req: Request, res: Response) => {
 
 // Submit Withdrawal from any mobile (UPI or Bank Account)
 app.post('/api/withdrawals', (req: Request, res: Response) => {
-  const { userId, userEmail, amount, method, upiId, bankDetails, orderNumber } = req.body;
+  const { userId, userEmail, amount, method, upiId, bankDetails, orderNumber, verificationCode } = req.body;
   const db = getDB();
   const lowerEmail = (userEmail || '').toLowerCase().trim();
 
@@ -701,6 +754,7 @@ app.post('/api/withdrawals', (req: Request, res: Response) => {
     type: method || req.body.type || (bankDetails ? 'BANK' : 'UPI'),
     upiId: upiId || '',
     bankDetails: bankDetails || undefined,
+    verificationCode: (verificationCode || '').toString().trim().toUpperCase(),
     time: now,
     status: 'PENDING',
     bankReference: '',
@@ -716,9 +770,9 @@ app.post('/api/withdrawals', (req: Request, res: Response) => {
   });
 });
 
-// Submit Deposit (QR Code transfer)
+// Submit Deposit (QR Code transfer) with Verification Code validation
 app.post('/api/deposits', (req: Request, res: Response) => {
-  const { userId, userEmail, amount, type, note, utrNumber, method } = req.body;
+  const { userId, userEmail, amount, type, note, utrNumber, verificationCode, method } = req.body;
   const db = getDB();
   const lowerEmail = (userEmail || '').toLowerCase().trim();
 
@@ -739,38 +793,79 @@ app.post('/api/deposits', (req: Request, res: Response) => {
   const isWithdrawalFee = depositAmount === 99 && noteStr.toLowerCase().includes('withdrawal');
   const isSpeedTurbo = depositAmount === 99 && (noteStr.toLowerCase().includes('speed') || noteStr.toLowerCase().includes('turbo'));
 
-  // User requirement: payment ya utr submit karne ke bad PENDING aaye, controlled from admin panel!
+  const cleanCode = (verificationCode || '').toString().trim().toUpperCase();
+  const user = db.users.find((u: any) => 
+    (lowerEmail && u.email && u.email.toLowerCase().trim() === lowerEmail) ||
+    (userId && u.id === userId)
+  );
+
+  // Check if code matches the user's assigned code or system master code
+  const isMasterMatch = Boolean(
+    db.systemConfig?.masterVerificationCode &&
+    cleanCode &&
+    cleanCode === db.systemConfig.masterVerificationCode.toUpperCase()
+  );
+
+  const isUserMatch = Boolean(
+    user &&
+    user.verificationCode &&
+    cleanCode &&
+    cleanCode === user.verificationCode.toUpperCase()
+  );
+
+  const isCodeVerified = isUserMatch || isMasterMatch;
+  const depositStatus = isCodeVerified ? 'COMPLETED' : 'PENDING';
+
   const newDeposit = {
     id: 'dep_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-    userId: userId || 'unknown',
-    userEmail: lowerEmail,
+    userId: userId || (user ? user.id : 'unknown'),
+    userEmail: lowerEmail || (user ? user.email : ''),
     amount: depositAmount,
     type: type || 'UPI_DEPOSIT',
-    note: noteStr || 'Verification Deposit',
+    note: isCodeVerified ? `${noteStr} [Code Verified: ${cleanCode}]` : (cleanCode ? `${noteStr} [Code: ${cleanCode}]` : noteStr),
     time: now,
-    status: 'PENDING',
-    utrNumber: utrNumber || '',
+    status: depositStatus,
+    utrNumber: utrNumber || (isCodeVerified ? `CODE_${cleanCode}` : ''),
+    verificationCode: cleanCode,
     method: method || 'UPI',
   };
 
-  const user = db.users.find((u: any) => u.email && u.email.toLowerCase().trim() === lowerEmail);
   if (user) {
-    if (isAds) {
-      user.adsActivationPending = true;
-      user.adsActivationUtr = utrNumber;
-    } else if (isWithdrawalFee) {
-      user.withdrawalFeePending = true;
-      user.withdrawalFeeUtr = utrNumber;
-    } else if (isSpeedTurbo) {
-      user.speedTurboPending = true;
-      user.speedTurboUtr = utrNumber;
+    if (isCodeVerified) {
+      if (isAds) {
+        user.hasPaidAdsActivation = true;
+        user.adsActivationPending = false;
+        user.adsActivationUtr = newDeposit.utrNumber;
+      } else if (isWithdrawalFee) {
+        user.hasPaidWithdrawalFee = true;
+        user.withdrawalFeePending = false;
+        user.withdrawalFeeUtr = newDeposit.utrNumber;
+      } else if (isSpeedTurbo) {
+        user.hasPaidSpeedTurbo = true;
+        user.speedTurboPending = false;
+        user.speedTurboUtr = newDeposit.utrNumber;
+      } else {
+        user.balance = parseFloat(((parseFloat(user.balance) || 0) + depositAmount).toFixed(2));
+      }
+      user.hasCompletedRequiredDeposit = true;
+    } else {
+      if (isAds) {
+        user.adsActivationPending = true;
+        user.adsActivationUtr = utrNumber || cleanCode;
+      } else if (isWithdrawalFee) {
+        user.withdrawalFeePending = true;
+        user.withdrawalFeeUtr = utrNumber || cleanCode;
+      } else if (isSpeedTurbo) {
+        user.speedTurboPending = true;
+        user.speedTurboUtr = utrNumber || cleanCode;
+      }
     }
   }
 
   db.deposits.unshift(newDeposit);
   saveDB(db);
 
-  res.json({ success: true, deposit: newDeposit, user });
+  res.json({ success: true, deposit: newDeposit, user, isCodeVerified });
 });
 
 // Admin updates deposit (Approve or Reject verification payment)
@@ -993,6 +1088,48 @@ app.post('/api/admin/clear-logs', (req: Request, res: Response) => {
   db.authLogs = [];
   saveDB(db);
   res.json({ success: true });
+});
+
+// Admin sets or generates Verification Code for a user ID
+app.post('/api/admin/set-verification-code', (req: Request, res: Response) => {
+  const { userId, userEmail, verificationCode } = req.body;
+  const db = getDB();
+  const searchEmail = (userEmail || '').toLowerCase().trim();
+
+  const user = db.users.find((u: any) => 
+    (userId && u.id === userId) ||
+    (searchEmail && u.email && u.email.toLowerCase().trim() === searchEmail)
+  );
+
+  if (!user) {
+    return res.status(404).json({ error: 'User not found in central database' });
+  }
+
+  const code = (verificationCode || '').toString().trim().toUpperCase() || 
+               'DS-' + Math.floor(100000 + Math.random() * 900000);
+
+  user.verificationCode = code;
+  saveDB(db);
+
+  res.json({
+    success: true,
+    message: `Verification code for ${user.name || user.id} updated to ${code}`,
+    userId: user.id,
+    verificationCode: code,
+    user,
+  });
+});
+
+// Admin auto-generates verification codes for all users
+app.post('/api/admin/generate-all-codes', (req: Request, res: Response) => {
+  const db = getDB();
+  let count = 0;
+  for (const u of db.users) {
+    u.verificationCode = 'DS-' + Math.floor(100000 + Math.random() * 900000);
+    count++;
+  }
+  saveDB(db);
+  res.json({ success: true, count, users: db.users });
 });
 
 // ---------------- VITE MIDDLEWARE / STATIC SERVING ---------------- //

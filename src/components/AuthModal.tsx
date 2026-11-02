@@ -148,18 +148,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    if (!password.trim()) {
+      setErrorMessage('कृपया अपना पासवर्ड / PIN दर्ज करें।');
+      return;
+    }
+
     // SIGNUP
     if (mode === 'SIGNUP') {
+      if (!name.trim()) {
+        setErrorMessage('कृपया अपना पूरा नाम दर्ज करें।');
+        return;
+      }
+
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
-      const signupEmail = cleanInput.includes('@') ? cleanInput : `${cleanInput.replace(/\D/g, '') || cleanInput}@datasell.in`;
+      const rawDigits = cleanInput.replace(/\D/g, '');
+      const isMobileNumber = rawDigits.length === 10 || (rawDigits.length > 10 && rawDigits.startsWith('91'));
+      const normalizedDigits = isMobileNumber ? rawDigits.slice(-10) : rawDigits;
+      
+      const signupEmail = cleanInput.includes('@') 
+        ? cleanInput 
+        : `${normalizedDigits || cleanInput}@datasell.in`;
+      const signupPhone = normalizedDigits.length === 10 
+        ? `+91 ${normalizedDigits}` 
+        : (phone.trim() || '+91 98000 00000');
       
       try {
         const res = await api.signup({
           email: signupEmail,
-          password: password.trim() || '1234',
+          password: password.trim(),
           name: name.trim() || signupEmail.split('@')[0],
-          phone: phone.trim() || (cleanInput.replace(/\D/g, '').length === 10 ? `+91 ${cleanInput.replace(/\D/g, '')}` : '+91 98000 00000'),
+          phone: signupPhone,
           device: deviceSignature,
         });
         setIsSubmitting(false);
@@ -178,6 +197,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             (res as any).deposits
           );
           onClose();
+        } else {
+          setErrorMessage('Registration failed. Please check your details.');
         }
       } catch (err) {
         setIsSubmitting(false);
@@ -188,7 +209,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // LOGIN
     if (mode === 'LOGIN') {
-      executeLogin(cleanInput, password.trim() || '1234');
+      executeLogin(cleanInput, password.trim());
     }
   };
 
