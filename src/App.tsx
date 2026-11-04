@@ -89,9 +89,25 @@ const EMPTY_USER_STATE: UserState = {
 };
 
 export default function App() {
+  // User authentication state: require signup/login before accessing app
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('datasell_is_logged_in') === 'true';
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  });
+
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('datasell_is_logged_in') !== 'true';
+    } catch {
+      return true;
+    }
+  });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Rewarded Video Ads State
@@ -112,16 +128,6 @@ export default function App() {
   }>({
     isOpen: false,
     type: 'ADS_199',
-  });
-
-  // User authentication state: require signup/login before accessing app
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('datasell_is_logged_in') === 'true';
-    } catch (e) {
-      console.error(e);
-      return false;
-    }
   });
 
   // 1. System Config
@@ -731,6 +737,7 @@ export default function App() {
     }
     setIsMenuOpen(false);
     setCurrentView('dashboard');
+    setIsAuthModalOpen(true);
   };
 
   const handleAddDeposit = async (newDep: DepositRecord) => {

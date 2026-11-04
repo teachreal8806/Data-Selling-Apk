@@ -23,7 +23,6 @@
     "notice": "Our priority support desk is available 24/7 for deposit, withdrawal, and bandwidth assistance."
   },
   "users": [
-
     {
       "id": "usr_1793802333044_tdpx",
       "name": "Test User",
@@ -153,8 +152,8 @@
       "savedUpiId": "techreal8806@oksbi",
       "selectedPaymentMethod": "BANK",
       "signupTime": "04/09/2026, 09:15:00 am",
-      "lastLoginTime": "04/11/2026, 02:27:30 pm",
-      "lastActiveTime": "04/11/2026, 02:27:30 pm",
+      "lastLoginTime": "04/11/2026, 02:56:18 pm",
+      "lastActiveTime": "04/11/2026, 02:56:18 pm",
       "ipAddress": "127.0.0.1",
       "device": "Desktop Browser",
       "requireDepositBeforeWithdrawal": false,
@@ -185,8 +184,8 @@
       "savedUpiId": "techreal8806@oksbi",
       "selectedPaymentMethod": "PhonePe",
       "signupTime": "23/10/2026, 1:15:16 pm",
-      "lastLoginTime": "04/11/2026, 02:36:06 pm",
-      "lastActiveTime": "04/11/2026, 02:36:06 pm",
+      "lastLoginTime": "04/11/2026, 02:56:18 pm",
+      "lastActiveTime": "04/11/2026, 02:56:18 pm",
       "ipAddress": "127.0.0.1",
       "device": "Desktop Browser",
       "requireDepositBeforeWithdrawal": false,
@@ -432,6 +431,30 @@
     }
   ],
   "authLogs": [
+    {
+      "id": "log_1793804178407_1pfl",
+      "userId": "usr_1792761316511_hnyn",
+      "userEmail": "sk@gmail.com",
+      "userName": "Tech Real",
+      "userPhone": "+91 9823537634",
+      "type": "LOGIN",
+      "timestamp": "04/11/2026, 02:56:18 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "log_1793804178385_2lb2",
+      "userId": "usr_admin_default",
+      "userEmail": "techreal8806@gmail.com",
+      "userName": "Deepak Kumar",
+      "userPhone": "7543355356",
+      "type": "LOGIN",
+      "timestamp": "04/11/2026, 02:56:18 pm",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop Browser",
+      "status": "SUCCESS"
+    },
     {
       "id": "log_1793802966233_uvtk",
       "userId": "usr_1793802966223_feec",

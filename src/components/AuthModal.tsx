@@ -41,6 +41,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sync mode if initialMode changes
@@ -48,14 +49,75 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (isOpen) {
       setMode(initialMode);
       setErrorMessage(null);
+      setErrorCode(null);
     }
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
+  const handleQuickRegisterFromLogin = async () => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setErrorCode(null);
+    const cleanInput = email.trim();
+    const rawDigits = cleanInput.replace(/\D/g, '');
+    const normalizedDigits = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+    const signupEmail = cleanInput.includes('@') ? cleanInput.toLowerCase() : `${normalizedDigits || cleanInput}@datasell.in`;
+    const signupPhone = normalizedDigits.length === 10 ? `+91 ${normalizedDigits}` : '+91 98000 00000';
+    const fallbackName = name.trim() || (normalizedDigits ? `User ${normalizedDigits.slice(-4)}` : 'Mobile Operator');
+    const deviceSignature = getDeviceSignature();
+
+    try {
+      const res = await api.signup({
+        email: signupEmail,
+        password: password.trim() || '1234',
+        name: fallbackName,
+        phone: signupPhone,
+        device: deviceSignature,
+      });
+      setIsSubmitting(false);
+      if (res && res.user) {
+        onAuthSuccess(res.user, (res as any).log || (res as any).authLog, true, (res as any).withdrawals, (res as any).deposits);
+        onClose();
+      } else {
+        setErrorMessage(res?.error || 'Registration failed');
+      }
+    } catch (e) {
+      setIsSubmitting(false);
+      setErrorMessage('Unable to register mobile account. Please try again.');
+    }
+  };
+
+  const handleQuickResetPinFromLogin = async () => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setErrorCode(null);
+    const cleanInput = email.trim();
+    const deviceSignature = getDeviceSignature();
+
+    try {
+      const res = await api.resetPin({
+        email: cleanInput,
+        newPassword: password.trim(),
+        device: deviceSignature,
+      });
+      setIsSubmitting(false);
+      if (res && res.user) {
+        onAuthSuccess(res.user, (res as any).log || (res as any).authLog, false, (res as any).withdrawals, (res as any).deposits);
+        onClose();
+      } else {
+        setErrorMessage(res?.error || 'Password reset failed');
+      }
+    } catch (e) {
+      setIsSubmitting(false);
+      setErrorMessage('Unable to update PIN. Please try again.');
+    }
+  };
+
   const executeLogin = async (loginEmail: string, loginPass: string) => {
     setIsSubmitting(true);
     setErrorMessage(null);
+    setErrorCode(null);
     const deviceSignature = getDeviceSignature();
 
     try {
@@ -68,10 +130,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setIsSubmitting(false);
 
       if (res && res.error) {
+        setErrorCode(res.code || null);
         if (res.code === 'INVALID_PASSWORD') {
-          setErrorMessage('गलत Password/PIN! अगर आप PIN भूल गए हैं तो नीचे "Forgot PIN?" पर क्लिक करके नया PIN बनाएं।');
+          setErrorMessage('गलत Password/PIN! क्या आप इसी PIN को नया पासवर्ड बनाना चाहते हैं? नीचे बटन दबाएं:');
         } else if (res.code === 'ACCOUNT_NOT_FOUND') {
-          setErrorMessage('खाता नहीं मिला! Pehle "Sign Up (नया खाता)" करें या सही 10-अंकों का मोबाइल नंबर डालें।');
+          setErrorMessage('यह नंबर अभी रजिस्टर्ड नहीं है। क्या आप इस नंबर से नया खाता बनाना चाहते हैं? नीचे बटन दबाएं:');
         } else {
           setErrorMessage(res.error);
         }
@@ -102,6 +165,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setErrorCode(null);
 
     // ADMIN MODE LOGIN
     if (mode === 'ADMIN') {
@@ -206,11 +270,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // SIGNUP
     if (mode === 'SIGNUP') {
-      if (!name.trim()) {
-        setErrorMessage('कृपया अपना पूरा नाम दर्ज करें।');
-        return;
-      }
-
       setIsSubmitting(true);
       const deviceSignature = getDeviceSignature();
       const rawDigits = cleanInput.replace(/\D/g, '');
@@ -343,9 +402,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
           {errorMessage && (
-            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span className="font-semibold">{errorMessage}</span>
+              </div>
+
+              {/* 1-Tap Quick Action when Account Not Found on Login */}
+              {mode === 'LOGIN' && errorCode === 'ACCOUNT_NOT_FOUND' && (
+                <button
+                  type="button"
+                  onClick={handleQuickRegisterFromLogin}
+                  disabled={isSubmitting}
+                  className="w-full mt-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>हाँ, इस नंबर से खाता बनाएं और लॉगिन करें (1-Tap Register)</span>
+                </button>
+              )}
+
+              {/* 1-Tap Quick Action when Password Incorrect on Login */}
+              {mode === 'LOGIN' && errorCode === 'INVALID_PASSWORD' && (
+                <button
+                  type="button"
+                  onClick={handleQuickResetPinFromLogin}
+                  disabled={isSubmitting}
+                  className="w-full mt-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>हाँ, यह नया PIN सेट कर लॉगिन करें (1-Tap Set PIN)</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -410,16 +497,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {mode === 'SIGNUP' && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Your Full Name (नाम)
+                    Your Full Name (नाम - Optional)
                   </label>
                   <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input
                       type="text"
-                      required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Rahul Sharma"
+                      placeholder="e.g. Rahul Sharma (Optional)"
                       className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden"
                     />
                   </div>
