@@ -52,7 +52,8 @@
         "bankName": "HDFC Bank",
         "accountNumber": "50100412345678",
         "ifscCode": "HDFC0001234"
-      }
+      },
+      "verificationCode": "DS-534063"
     },
     {
       "id": "usr_1793115005687_hoqv",
@@ -77,7 +78,8 @@
       "hasPaidAdsActivation": false,
       "hasPaidWithdrawalFee": false,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 0
+      "withdrawalCount": 0,
+      "verificationCode": "DS-381709"
     },
     {
       "id": "usr_1793025355000_a3dl",
@@ -108,7 +110,8 @@
         "bankName": "State Bank of India",
         "accountNumber": "30894729103",
         "ifscCode": "SBIN0001234"
-      }
+      },
+      "verificationCode": "DS-867071"
     },
     {
       "id": "usr_admin_default",
@@ -139,7 +142,8 @@
         "bankName": "Punjab National Bank",
         "accountNumber": "0192000100234567",
         "ifscCode": "PUNB0019200"
-      }
+      },
+      "verificationCode": "DS-815848"
     },
     {
       "id": "usr_1792761316511_hnyn",
@@ -164,7 +168,8 @@
       "hasPaidAdsActivation": false,
       "hasPaidWithdrawalFee": false,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 0
+      "withdrawalCount": 0,
+      "verificationCode": "DS-179125"
     },
     {
       "id": "usr_1792764170784_updx",
@@ -189,7 +194,8 @@
       "hasPaidAdsActivation": false,
       "hasPaidWithdrawalFee": false,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 0
+      "withdrawalCount": 0,
+      "verificationCode": "DS-406726"
     },
     {
       "id": "usr_1792764326763_q8k1",
@@ -214,7 +220,8 @@
       "hasPaidAdsActivation": false,
       "hasPaidWithdrawalFee": false,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 0
+      "withdrawalCount": 0,
+      "verificationCode": "DS-218135"
     },
     {
       "id": "usr_1",
@@ -239,7 +246,8 @@
       "hasPaidAdsActivation": false,
       "hasPaidWithdrawalFee": false,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 0
+      "withdrawalCount": 0,
+      "verificationCode": "DS-907710"
     },
     {
       "id": "usr_2",
@@ -264,7 +272,8 @@
       "hasPaidAdsActivation": false,
       "hasPaidWithdrawalFee": false,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 0
+      "withdrawalCount": 0,
+      "verificationCode": "DS-852221"
     },
     {
       "id": "usr_3",
@@ -289,7 +298,8 @@
       "hasPaidAdsActivation": false,
       "hasPaidWithdrawalFee": false,
       "hasPaidSpeedTurbo": false,
-      "withdrawalCount": 0
+      "withdrawalCount": 0,
+      "verificationCode": "DS-598738"
     }
   ],
   "withdrawals": [
