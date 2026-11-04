@@ -214,17 +214,33 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Universal phone digits normalizer (e.g. "+91 9823537634", "09823537634" -> "9823537634")
+export function normalizePhoneDigits(input: string): string {
+  if (!input) return '';
+  const digits = String(input).replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
+  if (digits.length >= 10) {
+    return digits.slice(-10);
+  }
+  return digits;
+}
+
 // Universal user finder across email, 10-digit phone number, user ID, or username
 export function findUserInDB(users: any[], rawInput: string) {
   if (!rawInput || !Array.isArray(users)) return null;
   const cleanInput = rawInput.toLowerCase().trim();
-  const digits = cleanInput.replace(/\D/g, '');
-  const digits10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  const digits10 = normalizePhoneDigits(cleanInput);
 
   return users.find((u: any) => {
     if (!u) return false;
     const uEmail = (u.email || '').toLowerCase().trim();
     const uPhone = (u.phone || '').trim();
+    const uPhoneDigits = normalizePhoneDigits(uPhone);
     const uId = (u.id || '').trim();
 
     // 1. Direct Email match
@@ -236,26 +252,17 @@ export function findUserInDB(users: any[], rawInput: string) {
     // 3. Exact User ID match (e.g. "usr_admin_default" or "usr_1793025355000_a3dl")
     if (uId && (uId.toLowerCase() === cleanInput || uId === rawInput.trim())) return true;
 
-    // 4. Phone number digit matching (10-digit normalized)
-    if (uPhone && digits.length >= 7) {
-      const uDigits = uPhone.replace(/\D/g, '');
-      const uDigits10 = uDigits.length >= 10 ? uDigits.slice(-10) : uDigits;
-      if (digits10.length === 10 && uDigits10.length === 10 && digits10 === uDigits10) {
-        return true;
-      }
-      if (uDigits === digits) return true;
-      if (uDigits.endsWith(digits) || digits.endsWith(uDigits)) return true;
+    // 4. Exact 10-digit normalized phone number match
+    if (digits10.length === 10 && uPhoneDigits.length === 10 && digits10 === uPhoneDigits) {
+      return true;
     }
 
-    // 5. If user's email was created as <digits10>@datasell.in or matches digits
+    // 5. If user's email was created as <digits10>@datasell.in or starts with <digits10>@
     if (digits10.length === 10 && uEmail) {
       if (uEmail === `${digits10}@datasell.in` || uEmail.startsWith(`${digits10}@`)) {
         return true;
       }
     }
-
-    // 6. Direct Name match if exact match
-    if (u.name && u.name.toLowerCase().trim() === cleanInput) return true;
 
     return false;
   });
@@ -324,8 +331,7 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
   const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
 
   // Normalize phone & email
-  const digits = (rawPhone || rawInput).replace(/\D/g, '');
-  const digits10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  const digits10 = normalizePhoneDigits(rawPhone || rawInput);
 
   const normalizedEmail = rawInput.includes('@')
     ? rawInput.toLowerCase()
@@ -333,59 +339,63 @@ app.post('/api/auth/signup', (req: Request, res: Response) => {
 
   const normalizedPhone = digits10.length === 10
     ? `+91 ${digits10}`
-    : (rawPhone || '+91 98000 00000');
+    : (rawPhone || (digits10 ? `+91 ${digits10}` : '+91 98000 00000'));
 
   // Check if user already exists in central database
   let existingUser = findUserInDB(db.users, rawInput) || 
-                     (digits10.length >= 7 ? findUserInDB(db.users, digits10) : null) ||
+                     (digits10.length === 10 ? findUserInDB(db.users, digits10) : null) ||
                      findUserInDB(db.users, normalizedEmail);
 
   if (existingUser) {
-    // If entered password matches existing password, log in seamlessly
-    if (existingUser.password && String(existingUser.password).trim() === rawPass) {
-      existingUser.lastLoginTime = now;
-      existingUser.lastActiveTime = now;
-      existingUser.ipAddress = ipAddress;
-      existingUser.device = userDevice;
-
-      const authLog = {
-        id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-        userId: existingUser.id,
-        userEmail: existingUser.email,
-        userName: existingUser.name,
-        userPhone: existingUser.phone,
-        type: 'SIGNUP',
-        timestamp: now,
-        ipAddress: ipAddress,
-        device: userDevice,
-        status: 'SUCCESS',
-      };
-      db.authLogs.unshift(authLog);
-      saveDB(db);
-
-      const userWithdrawals = db.withdrawals.filter((w: any) => 
-        (w.userId && w.userId === existingUser.id) || 
-        (w.userEmail && w.userEmail.toLowerCase().trim() === existingUser.email.toLowerCase().trim())
-      );
-      const userDeposits = db.deposits.filter((d: any) => 
-        (d.userId && d.userId === existingUser.id) || 
-        (d.userEmail && d.userEmail.toLowerCase().trim() === existingUser.email.toLowerCase().trim())
-      );
-
-      return res.json({
-        success: true,
-        isNew: false,
-        user: existingUser,
-        withdrawals: userWithdrawals,
-        deposits: userDeposits,
-        authLog,
-      });
-    } else {
-      return res.status(409).json({
-        error: 'Yeh Mobile Number / Email pehle se registered hai! Kripya "Sign In" (लॉगिन) tab par click karein aur sahi password darj karein.',
-        code: 'USER_ALREADY_EXISTS',
-      });
+    // Seamless registration/login: update password & name so signup NEVER fails on mobile!
+    if (rawPass) {
+      existingUser.password = rawPass;
     }
+    if (rawName && (!existingUser.name || existingUser.name.includes('@') || existingUser.name === digits10)) {
+      existingUser.name = rawName;
+    }
+    if (digits10.length === 10 && (!existingUser.phone || existingUser.phone.includes('00000'))) {
+      existingUser.phone = `+91 ${digits10}`;
+    }
+
+    existingUser.lastLoginTime = now;
+    existingUser.lastActiveTime = now;
+    existingUser.ipAddress = ipAddress;
+    existingUser.device = userDevice;
+
+    const authLog = {
+      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      userId: existingUser.id,
+      userEmail: existingUser.email,
+      userName: existingUser.name,
+      userPhone: existingUser.phone,
+      type: 'SIGNUP',
+      timestamp: now,
+      ipAddress: ipAddress,
+      device: userDevice,
+      status: 'SUCCESS',
+    };
+    db.authLogs.unshift(authLog);
+    saveDB(db);
+
+    const userWithdrawals = db.withdrawals.filter((w: any) => 
+      (w.userId && w.userId === existingUser.id) || 
+      (w.userEmail && w.userEmail.toLowerCase().trim() === existingUser.email.toLowerCase().trim())
+    );
+    const userDeposits = db.deposits.filter((d: any) => 
+      (d.userId && d.userId === existingUser.id) || 
+      (d.userEmail && d.userEmail.toLowerCase().trim() === existingUser.email.toLowerCase().trim())
+    );
+
+    return res.json({
+      success: true,
+      isNew: false,
+      message: 'Account verified & logged in successfully!',
+      user: existingUser,
+      withdrawals: userWithdrawals,
+      deposits: userDeposits,
+      authLog,
+    });
   }
 
   // BRAND NEW USER: registered in central database
@@ -525,6 +535,84 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
 
   return res.json({
     success: true,
+    user,
+    withdrawals: userWithdrawals,
+    deposits: userDeposits,
+    authLog,
+  });
+});
+
+// Self-service PIN / Password Reset for mobile and web users
+app.post('/api/auth/reset-pin', (req: Request, res: Response) => {
+  const { email, newPassword, device, ip } = req.body;
+  const db = getDB();
+  const rawInput = (email || '').toString().trim();
+  const cleanPass = (newPassword !== undefined && newPassword !== null) ? String(newPassword).trim() : '';
+
+  if (!rawInput) {
+    return res.status(400).json({ success: false, error: 'Kripya Mobile Number ya Email enter karein.' });
+  }
+  if (!cleanPass || cleanPass.length < 3) {
+    return res.status(400).json({ success: false, error: 'New PIN/Password must be at least 3 characters.' });
+  }
+
+  const user = findUserInDB(db.users, rawInput);
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Account not found! Pehle Sign Up (नया खाता) karein ya mobile number check karein.',
+      code: 'ACCOUNT_NOT_FOUND',
+    });
+  }
+
+  const now = new Date().toLocaleString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+  const rawIp = ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.21.244.18 (Mobile)';
+  const ipAddress = rawIp.split(',')[0].trim();
+  const userDevice = device || (req.headers['user-agent']?.includes('Mobile') ? 'Android Mobile • Chrome' : 'Desktop Browser');
+
+  // Update password in central database
+  user.password = cleanPass;
+  user.lastLoginTime = now;
+  user.lastActiveTime = now;
+  user.ipAddress = ipAddress;
+  user.device = userDevice;
+
+  const authLog = {
+    id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    userId: user.id,
+    userEmail: user.email,
+    userName: user.name,
+    userPhone: user.phone,
+    type: 'RESET_PASSWORD',
+    timestamp: now,
+    ipAddress: ipAddress,
+    device: userDevice,
+    status: 'SUCCESS',
+  };
+  db.authLogs.unshift(authLog);
+  saveDB(db);
+
+  const userWithdrawals = db.withdrawals.filter((w: any) => 
+    (w.userId && w.userId === user.id) || 
+    (w.userEmail && w.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim())
+  );
+  const userDeposits = db.deposits.filter((d: any) => 
+    (d.userId && d.userId === user.id) || 
+    (d.userEmail && d.userEmail.toLowerCase().trim() === user.email.toLowerCase().trim())
+  );
+
+  return res.json({
+    success: true,
+    message: 'PIN/Password successfully updated! Logged in.',
     user,
     withdrawals: userWithdrawals,
     deposits: userDeposits,

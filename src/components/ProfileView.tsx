@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, LogOut, Sparkles, CheckCircle2, Building2, Cpu, KeyRound } from 'lucide-react';
+import { ArrowLeft, User, Mail, Smartphone, CreditCard, Award, Shield, Save, Check, LogOut, Sparkles, CheckCircle2, Building2, Cpu } from 'lucide-react';
 import { UserState, BankDetails } from '../types';
 
 interface ProfileViewProps {
@@ -234,20 +234,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <span>Save Account & Payout Details</span>
         </button>
       </form>
-
-      {/* Admin Gateway Access Button */}
-      {onOpenAdmin && (
-        <div className="pt-1">
-          <button
-            onClick={onOpenAdmin}
-            className="w-full py-2.5 px-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-slate-500" />
-            <span>Master System Administration</span>
-          </button>
-        </div>
-      )}
-
     </div>
   );
 };

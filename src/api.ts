@@ -100,6 +100,43 @@ export const api = {
     }
   },
 
+  // Auth: Reset PIN / Password
+  async resetPin(data: { email: string; newPassword: string; device?: string }) {
+    const cleanInput = (data.email || '').trim();
+    const cleanPass = (data.newPassword !== undefined && data.newPassword !== null) ? String(data.newPassword).trim() : '';
+
+    try {
+      const res = await fetch('/api/auth/reset-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, email: cleanInput, newPassword: cleanPass }),
+      });
+
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch (parseErr) {
+        console.warn('Non-JSON response in reset-pin', parseErr);
+      }
+
+      if (res.ok && json && json.success) {
+        return {
+          ...json,
+          log: json.authLog || json.log,
+        };
+      }
+
+      if (json && json.error) {
+        return { error: json.error, code: json.code };
+      }
+
+      return { error: 'Password reset failed. Please check your Mobile Number.' };
+    } catch (e) {
+      console.warn('API resetPin network error:', e);
+      return { error: 'Central Cloud Server unavailable. Please check internet connection.' };
+    }
+  },
+
   // Stream bandwidth sell packet
   async streamPacket(data: { email: string; mb: number; amount: number }) {
     try {

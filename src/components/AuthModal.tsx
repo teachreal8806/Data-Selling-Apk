@@ -32,7 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   isFirstTime = false,
   canClose = true,
 }) => {
-  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'ADMIN'>(initialMode);
+  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'ADMIN' | 'RESET_PIN'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [adminId, setAdminId] = useState(ADMIN_MASTER_ID);
@@ -60,7 +60,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       const res = await api.login({
-        email: loginEmail.trim().toLowerCase(),
+        email: loginEmail.trim(),
         password: loginPass.trim(),
         device: deviceSignature,
       });
@@ -68,7 +68,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setIsSubmitting(false);
 
       if (res && res.error) {
-        setErrorMessage(res.error);
+        if (res.code === 'INVALID_PASSWORD') {
+          setErrorMessage('गलत Password/PIN! अगर आप PIN भूल गए हैं तो नीचे "Forgot PIN?" पर क्लिक करके नया PIN बनाएं।');
+        } else if (res.code === 'ACCOUNT_NOT_FOUND') {
+          setErrorMessage('खाता नहीं मिला! Pehle "Sign Up (नया खाता)" करें या सही 10-अंकों का मोबाइल नंबर डालें।');
+        } else {
+          setErrorMessage(res.error);
+        }
         return;
       }
 
@@ -123,12 +129,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     }
 
-    const cleanInput = email.trim().toLowerCase();
+    const cleanInput = email.trim();
 
     // Check if user is trying to login as admin directly
     if (mode === 'LOGIN') {
       const explicitAdminUsernames = ['admin', 'deepakadmin', 'master_admin'];
-      if (explicitAdminUsernames.includes(cleanInput)) {
+      if (explicitAdminUsernames.includes(cleanInput.toLowerCase())) {
         if (password.trim() === ADMIN_MASTER_PASSWORD) {
           sessionStorage.setItem('datasell_admin_session', 'true');
           if (onAdminAuthSuccess) {
@@ -153,6 +159,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    // RESET_PIN (Self-service Forgot Password flow)
+    if (mode === 'RESET_PIN') {
+      if (password.trim().length < 3) {
+        setErrorMessage('नया PIN / Password कम से कम 3 अक्षरों या अंकों का होना चाहिए।');
+        return;
+      }
+
+      setIsSubmitting(true);
+      const deviceSignature = getDeviceSignature();
+      try {
+        const res = await api.resetPin({
+          email: cleanInput,
+          newPassword: password.trim(),
+          device: deviceSignature,
+        });
+        setIsSubmitting(false);
+
+        if (res && res.error) {
+          if (res.code === 'ACCOUNT_NOT_FOUND') {
+            setErrorMessage('खाता नहीं मिला! Pehle "Sign Up (नया खाता)" करें या सही मोबाइल नंबर डालें।');
+          } else {
+            setErrorMessage(res.error);
+          }
+          return;
+        }
+
+        if (res && res.user) {
+          onAuthSuccess(
+            res.user,
+            (res as any).log || (res as any).authLog,
+            false,
+            (res as any).withdrawals,
+            (res as any).deposits
+          );
+          onClose();
+        } else {
+          setErrorMessage('Password reset failed. Please check your mobile number.');
+        }
+      } catch (err) {
+        setIsSubmitting(false);
+        setErrorMessage('Unable to connect to central node. Please try again.');
+      }
+      return;
+    }
+
     // SIGNUP
     if (mode === 'SIGNUP') {
       if (!name.trim()) {
@@ -167,7 +218,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const normalizedDigits = isMobileNumber ? rawDigits.slice(-10) : rawDigits;
       
       const signupEmail = cleanInput.includes('@') 
-        ? cleanInput 
+        ? cleanInput.toLowerCase() 
         : `${normalizedDigits || cleanInput}@datasell.in`;
       const signupPhone = normalizedDigits.length === 10 
         ? `+91 ${normalizedDigits}` 
@@ -177,7 +228,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const res = await api.signup({
           email: signupEmail,
           password: password.trim(),
-          name: name.trim() || signupEmail.split('@')[0],
+          name: name.trim() || (normalizedDigits ? `User ${normalizedDigits.slice(-4)}` : signupEmail.split('@')[0]),
           phone: signupPhone,
           device: deviceSignature,
         });
@@ -231,6 +282,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <h3 className="text-sm font-bold text-white">
               {mode === 'ADMIN' ? (
                 'Master Admin Gateway'
+              ) : mode === 'RESET_PIN' ? (
+                'Reset PIN / Password (पासवर्ड बदलें)'
               ) : mode === 'LOGIN' ? (
                 'Cross-Mobile Universal Login'
               ) : (
@@ -240,6 +293,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <p className="text-[11px] text-slate-400 mt-0.5">
               {mode === 'ADMIN'
                 ? 'Authorized system control'
+                : mode === 'RESET_PIN'
+                ? 'Enter mobile number & set a new PIN'
                 : mode === 'LOGIN'
                 ? 'Sign in from any phone using Mobile Number or Email'
                 : 'Instant account setup • Zero paperwork'}
@@ -263,12 +318,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               setErrorMessage(null);
             }}
             className={`flex-1 py-3 text-center transition-all cursor-pointer min-h-[44px] ${
-              mode === 'LOGIN'
+              mode === 'LOGIN' || mode === 'RESET_PIN'
                 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-slate-900 font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Sign In (लॉगिन)
+            {mode === 'RESET_PIN' ? 'Reset PIN (पासवर्ड)' : 'Sign In (लॉगिन)'}
           </button>
           <button
             onClick={() => {
@@ -374,7 +429,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-200">
-                    {mode === 'LOGIN' ? 'Mobile Number or Email (मोबाइल नंबर या ईमेल)' : 'Mobile Number or Email'}
+                    {mode === 'LOGIN' ? 'Mobile Number or Email (मोबाइल नंबर या ईमेल)' : mode === 'RESET_PIN' ? 'Registered Mobile Number (रजिस्टर्ड मोबाइल)' : 'Mobile Number or Email'}
                   </label>
                   <span className="text-[10px] text-cyan-400 font-semibold">10-Digit Mobile / Email</span>
                 </div>
@@ -385,7 +440,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={mode === 'LOGIN' ? "Enter 10-digit Mobile or Email (e.g. 7543355356)" : "Enter 10-digit Mobile Number"}
+                    placeholder={mode === 'SIGNUP' ? "Enter 10-digit Mobile Number (e.g. 9823537634)" : "Enter 10-digit Mobile Number (e.g. 7543355356)"}
                     className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden font-mono"
                   />
                 </div>
@@ -399,8 +454,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-300">
-                    PIN / Password
+                    {mode === 'RESET_PIN' ? 'New PIN / Password (नया पासवर्ड)' : 'PIN / Password'}
                   </label>
+                  <div className="flex items-center gap-2">
+                    {mode === 'LOGIN' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode('RESET_PIN');
+                          setErrorMessage(null);
+                        }}
+                        className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
+                      >
+                        Forgot PIN? (पिन भूल गए?)
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span>{showPassword ? 'Hide' : 'Show'}</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="relative rounded-xl border border-slate-800 bg-slate-950 focus-within:border-cyan-400">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -409,7 +486,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter Password / PIN"
+                    placeholder={mode === 'RESET_PIN' ? "Enter New PIN / Password" : "Enter Password / PIN"}
                     className="w-full pl-10 pr-3 py-2.5 text-xs text-white bg-transparent focus:outline-hidden font-mono"
                   />
                 </div>
@@ -431,6 +508,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <LogIn className="w-4 h-4 text-slate-950" />
                     <span>Sign In to Bandwidth Node</span>
                   </>
+                ) : mode === 'RESET_PIN' ? (
+                  <>
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>Update PIN & Sign In (पासवर्ड बदलें)</span>
+                  </>
                 ) : (
                   <>
                     <UserPlus className="w-4 h-4 text-slate-950" />
@@ -439,20 +521,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 )}
               </button>
 
-              <div className="pt-2 text-center">
-                <p className="text-[11px] text-slate-400">
-                  {mode === 'LOGIN' ? "Don't have an account? " : 'Already registered? '}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
-                      setErrorMessage(null);
-                    }}
-                    className="text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
-                  >
-                    {mode === 'LOGIN' ? 'Sign Up Free' : 'Sign In'}
-                  </button>
-                </p>
+              <div className="pt-2 text-center space-y-1">
+                {mode === 'RESET_PIN' ? (
+                  <p className="text-[11px] text-slate-400">
+                    Remember your PIN?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('LOGIN');
+                        setErrorMessage(null);
+                      }}
+                      className="text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
+                    >
+                      Back to Sign In (लॉगिन करें)
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    {mode === 'LOGIN' ? "Don't have an account? " : 'Already registered? '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
+                        setErrorMessage(null);
+                      }}
+                      className="text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
+                    >
+                      {mode === 'LOGIN' ? 'Sign Up Free' : 'Sign In'}
+                    </button>
+                  </p>
+                )}
               </div>
             </>
           )}
